@@ -1,5 +1,7 @@
+from http import server
 import numpy as np
 import pulp
+import json
 
 from typing import List, Union
 
@@ -31,7 +33,7 @@ def var_get_name(name: str) -> tuple:
 class tsn_analyzer():
 
 
-    def __init__(self) -> None:
+    def __init__(self, filename:str=None) -> None:
         # The adjacency matrix for the network topology
         self.adjacency_mat = None
         self.num_servers = 0
@@ -40,16 +42,133 @@ class tsn_analyzer():
         self.flows = []
         self.num_flows = 0
 
-        # Arrival curves at the source of each flow, as a token-bucket model
-        self.arrival_curves = np.empty((0,2))
+        self.servers = []
 
-        # Service curves at each server, as a rate-latency model
-        self.service_curves = np.empty((0,2))
+        if filename is not None:
+            self.load(filename)
 
-        # Shapers as token-bucket models
-        self.shapers = np.empty((0,2))
 
-    
+    def load(self, filename:str) -> None:
+        '''
+        Load from a predefined network in json
+        '''
+        with open(filename) as f:
+            network_def = json.load(f)
+            # A network_def object should contain
+            #
+            # 1. adjacency matrix:
+            #  - a 2D array representing a directed graph
+            #
+            # 2. flows:
+            #  - a list of objects representing each flow.
+            #    a flow is defined by
+            #    - path: a list of non-repeating indicing of servers
+            #    - packet_length: max packet size arrives at this flow
+            #    - arrival_curve: an object defines a concave curve and contains
+            #      - burst: a number indicates initial burst
+            #      - times: list of time snapshots where the curve changes slopes
+            #      - rates: a decreasing list of arrival rates w.r.t. "times"
+            #
+            # 3. servers:
+            #  - a list of objects representing each server.
+            #    a server is defined by
+            #    - name: the name of the server
+            #    - capacity: the output capacity of server (shaper constraint)
+            #    - service_curve: an object defines a convex curve and contains
+            #      - latency: a number indicates the initial latency
+            #      - times: list of time snapshots where the curve changes slopes
+            #      - rates: a increasing list of service rates w.r.t. "times"
+
+        ## Load adjacency matrix
+        self.adjacency_mat = np.array(network_def['adjacency_matrix'])
+        self.num_servers   = self.adjacency_mat.shape[0]
+        # Assert the input is a valid adjacency matrix
+        assert len(self.adjacency_mat.shape) == 2
+        assert self.adjacency_mat.shape[0] == self.adjacency_mat.shape[1]
+
+        ## Load flows
+        self.flows = []
+        for id, fl in enumerate(network_def['flows']):
+            path = fl["path"]
+            # Check if it's a valid path (no recurring server)
+            if len(path) != len(set(path)):
+                print(f"Skip flow {id} due to recurring server in its path: {path}")
+                continue
+
+            self.flows.append(fl.copy())
+
+        self.num_flows = len(self.flows)
+
+        ## Load servers
+        self.servers = []
+        for ser_id, ser in enumerate(network_def["servers"]):
+            self.servers.append(ser.copy())
+            pkt_len = [fl["packet_length"] for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
+            # Assign the maximum possible packet length that passes through the server
+            self.servers[ser_id]['packet_length'] = max(pkt_len)
+        
+        assert len(self.servers) == self.num_servers
+
+        
+
+
+    def set_utility(self, utility:float) -> dict:
+        '''
+        Set the utility (0,1) to the assigned value and assign an unanimous arrival rate r = u*R/n to all flows.
+        where u is utility; R is service rate; n is the maximum amount of flows goes through a server.
+
+        Params:
+        utility: (0,1) value of network utility/load
+
+        Returns:
+        num_flow: number of flows passses through a server
+        max_flow: maximum amount of flows passses through a server
+        arr_rate: the assigned arrival rate, None if no change of arrival rate
+        '''
+        # Calculate the number of flows passes through each server
+        num_flows_per_server = [0]*self.num_servers
+        for fl in self.flows:
+            for server_idx in fl["path"]:
+                num_flows_per_server[server_idx] += 1
+        
+        # Calculate the minimum service rate among servers
+        min_ser_rate = np.inf
+        for serv in self.servers:
+            rate = serv["service_curve"]["rates"][0]
+            if rate < min_ser_rate:
+                min_ser_rate = rate
+
+        # Calculate the corresponding arrival rate for the utility
+        max_flows = max(num_flows_per_server)
+        arr_rate = utility*min_ser_rate/max_flows
+
+        # Assign the new arrival rate
+        for fl in self.flows:
+            fl["arrival_curve"]["times"] = []
+            fl["arrival_curve"]["rates"] = [arr_rate]
+
+        return {"num_flow": num_flows_per_server,
+                "max_flow": max_flows,
+                "arr_rate": arr_rate}
+
+
+    def get_utility(self) -> float:
+        '''
+        Return the utility of current network
+        '''
+        # maximum aggregated arrival rate for each server
+        max_agg_arr_rate = np.array([0]*self.num_servers)
+        for fl in self.flows:
+            for server_idx in fl["path"]:
+                max_agg_arr_rate[server_idx] += fl["arrival_curve"]["rates"][0]
+
+        ser_rates = np.array([0]*self.num_servers)
+        for idx, serv in enumerate(self.servers):
+            ser_rates[idx] = serv["service_curve"]["rates"][0]
+        
+        return max(max_agg_arr_rate / ser_rates)
+
+
     def set_topology(self, adjacency_mat=np.ndarray) -> None:
         '''
         Assign network topology as a directed graph with a adjacency matrix
@@ -102,130 +221,14 @@ class tsn_analyzer():
             self.adjacency_mat = np.copy(new_adj_mat)
 
 
-    def add_flows(self, flows:list, burst:Union[list,float], rate:Union[list,float]) -> None:
-        '''
-        Add new flows to the existing flows, as token-bucket model
 
-        Params
-        The input "flows" can be 1D list to represent 1 new flow, or a 2D list for multiple new flows 
-        '''
-
-        assert len(flows) > 0
-        
-        # Check dimensionality: 1D
-        if type(flows[0]) is int:
-            self.flows.append(flows.copy())
-            self.num_flows += 1
-
-            self.arrival_curves = np.r_[self.arrival_curves, [[burst, rate]]]
-
-        # 2D: list of lists
-        elif type(flows[0]) is list:
-            assert len(flows) == len(burst)
-            assert len(flows) == len(rate)
-
-            for idx, fl in enumerate(flows):
-                assert len(fl) > 0
-                assert type(fl[0]) is int
-
-                self.flows.append(fl.copy())
-                self.num_flows += 1
-
-                self.arrival_curves = np.r_[self.arrival_curves, [[burst[idx], rate[idx]]]]
-
-
-    def set_arrival(self, flow_idx:int, burst:float, rate:float) -> None:
-        '''
-        Set the arrival curve for a specific flow as a token-bucket model
-
-        Params:
-        flow_idx: the index of the flow
-        burst: the burst constraint
-        rate: the arrival rate constraint
-        '''
-        assert flow_idx < self.num_flows
-
-        self.arrival_curves[flow_idx, :] = np.array([burst, rate])
-
-
-    def set_service(self, server_idx:int, rate:float, latency:float) -> None:
-        '''
-        Set the service curve for a specific server as a rate-latency model
-
-        Params:
-        server_idx: the index of the server
-        rate: the service rate constraint
-        latency: the latency constraint
-        '''
-        assert server_idx < self.num_servers
-
-        # If dimension doesn't match, extend to the right dimension
-        if self.service_curves.shape[0] != self.num_servers:
-            new_service = np.empty((self.num_servers, 2))
-            new_service[:self.service_curves.shape[0], :] = self.service_curves
-            self.service_curves = new_service
-
-        # Assign the service curve
-        self.service_curves[server_idx, :] = np.array([rate, latency])
-
-    
-    def set_service_all(self, rates:Union[list,np.ndarray], latencies:Union[list,np.ndarray]) -> None:
-        '''
-        Set all the service curves together.
-        The dimension of rates/latency must has length equals to the number of servers
-        '''
-        assert self.num_servers == len(rates)
-        assert self.num_servers == len(latencies)
-
-        self.service_curves = np.empty((self.num_servers, 2))
-        self.service_curves[:, 0] = np.array(rates)
-        self.service_curves[:, 1] = np.array(latencies)
-
-
-    def set_service(self, server_idx:int, pkt_leng:float, capacity:float) -> None:
-        '''
-        Set the service curve for a specific server as a pkt_leng-capacity model
-
-        Params:
-        server_idx: the index of the server
-        pkt_leng: the packet length constraint
-        capacity: the capacity constraint
-        '''
-        assert server_idx < self.num_servers
-
-        # If dimension doesn't match, extend to the right dimension
-        if self.shapers.shape[0] != self.num_servers:
-            new_shapers = np.empty((self.num_servers, 2))
-            new_shapers[:self.shapers.shape[0], :] = self.shapers
-            self.shapers = new_shapers
-
-        # Assign the service curve
-        self.shapers[server_idx, :] = np.array([pkt_leng, capacity])
-
-    def set_shaper_all(self, pkt_leng:Union[list,np.ndarray], capacity:Union[list,np.ndarray]) -> None:
-        '''
-        Set all the shapers together.
-        The dimension of packet_length/capacity must has length equals to the number of servers
-        '''
-        assert self.num_servers == len(pkt_leng)
-        assert self.num_servers == len(capacity)
-
-        self.shapers = np.empty((self.num_servers, 2))
-        self.shapers[:, 0] = np.array(pkt_leng)
-        self.shapers[:, 1] = np.array(capacity)
-
-
-    def solve_tfa(self) -> list:
+    def solve_tfa(self, problem_name:str="TFA problem") -> list:
         '''
         Solve the TFA problem given that the network is defined properly
 
         Returns:
         delays: array of delay guarantees at each server
         '''
-        # ensure the problem is properly defined
-        assert self.adjacency_mat is not None
-        assert len(self.arrival_curves) == self.num_flows
-        assert len(self.service_curves) == self.num_servers
 
         # setup the lp problem for the TFA Linear program
         tfa_prog = pulp.LpProblem('TFA_Program', pulp.LpMaximize)
@@ -238,65 +241,109 @@ class tsn_analyzer():
         bursts     = [[None]*self.num_servers for _ in range(self.num_flows)]
 
         # for all server j
-        for server in range(self.num_servers):
+        for server_idx, server in enumerate(self.servers):
             # Time constraints
-            s_var = var_set_name('s', server)
-            t_var = var_set_name('t', server)
-            in_time[server]  = pulp.LpVariable(s_var, 0)
-            out_time[server] = pulp.LpVariable(t_var)
+            s_var = var_set_name('s', server_idx)
+            t_var = var_set_name('t', server_idx)
+            in_time[server_idx]  = pulp.LpVariable(s_var, 0)
+            out_time[server_idx] = pulp.LpVariable(t_var)
             
-            tfa_prog += in_time[server] <= out_time[server]    # add constraint that s <= t
+            tfa_prog += in_time[server_idx] <= out_time[server_idx]    # add constraint that s <= t
 
             # Arrival constraints
-            for fl in self.__get_flows(server):
-                As_var = var_set_name('As', fl, server)
-                x_var  = var_set_name('x' , fl, server)
-                Dt_var = var_set_name('Dt', fl, server)
-                arrivals[fl][server]   = pulp.LpVariable(As_var)
-                bursts[fl][server]     = pulp.LpVariable(x_var)
-                departures[fl][server] = pulp.LpVariable(Dt_var)
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                As_var = var_set_name('As', fl_idx, server_idx)
+                x_var  = var_set_name('x' , fl_idx, server_idx)
+                Dt_var = var_set_name('Dt', fl_idx, server_idx)
+                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var)
+                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var)
+                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var)
 
-                tfa_prog += arrivals[fl][server] <= bursts[fl][server] + self.arrival_curves[fl][1]*in_time[server]
+                arrival_curve = fl["arrival_curve"]
 
-            # Service constraints
-            tfa_prog += pulp.lpSum([departures[fl][server] for fl in self.__get_flows(server)]) \
-                        >= self.service_curves[server][0]*out_time[server] - self.service_curves[server][0]*self.service_curves[server][1]
-            tfa_prog += pulp.lpSum([departures[fl][server] for fl in self.__get_flows(server)]) >= 0
+                tfa_prog += arrivals[fl_idx][server_idx] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*in_time[server_idx]
 
-            # FIFO constraints
-            for fl in self.__get_flows(server):
-                tfa_prog += arrivals[fl][server] == departures[fl][server]
+                # Deal with the extra segments of the arrival curve because of piecewise linearity
+                num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
+                cumulation = 0
+                prev_t = 0  # previous time snap
+                for seg in range(num_arrcur_seg):
+                    cumulation += (arrival_curve["times"][seg] - prev_t) * arrival_curve["rates"][seg]
+                    tfa_prog += arrivals[fl_idx][server_idx] <= bursts[fl_idx][server_idx] + cumulation + arrival_curve["rates"][seg+1] * (in_time[server_idx] - arrival_curve["times"][seg])
+
+                    prev_t = arrival_curve["times"][seg]
+
+            ## Service constraints
+            service_curve = server["service_curve"]
+            tfa_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) \
+                        >= service_curve["rates"][0]*out_time[server_idx] - service_curve["rates"][0]*service_curve["latency"]
+            tfa_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) >= 0
+
+            # Check all segments of the piecewise linear service curve
+            num_sercur_seg = len(service_curve["times"])
+            cumulation = 0
+            prev_t = service_curve["latency"]
+            for seg in range(num_sercur_seg):
+                cumulation += service_curve["rates"][seg]*(service_curve["times"][seg] - prev_t)
+                tfa_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) \
+                            >= service_curve["rates"][seg+1] * (out_time[server_idx] - service_curve["times"][seg]) + cumulation
+
+                prev_t = service_curve["times"][seg]
+
+            ## FIFO constraints
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                tfa_prog += arrivals[fl_idx][server_idx] == departures[fl_idx][server_idx]
 
             # delays
-            d_var = var_set_name('d', server)
-            delays[server] = pulp.LpVariable(d_var)
+            d_var = var_set_name('d', server_idx)
+            delays[server_idx] = pulp.LpVariable(d_var)
 
-            tfa_prog += delays[server] <= out_time[server] - in_time[server]
+            tfa_prog += delays[server_idx] <= out_time[server_idx] - in_time[server_idx]
 
         # Constraints on burst variables (x)
         # Burst propagation
-        for server in range(self.num_servers):
-            for fl in self.__get_flows(server):
-                for succ in self.__get_successor(server):
-                    tfa_prog += bursts[fl][succ] <= bursts[fl][server] + self.arrival_curves[fl][1]*delays[server]
+        for server_idx, server in enumerate(self.servers):
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                arrival_curve = fl["arrival_curve"]
 
+                for succ in self.__get_successor(server_idx):
+                    tfa_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*delays[server_idx]
+                    # Consider piecewise linear arrival curves
+                    num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
+                    cumulation = 0
+                    prev_t = 0  # previous time snap
+                    for seg in range(num_arrcur_seg):
+                        cumulation += (arrival_curve["times"][seg] - prev_t) * arrival_curve["rates"][seg]
+                        tfa_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + cumulation + arrival_curve["rates"][seg+1] * (delays[server_idx] - arrival_curve["times"][seg])
+
+                        prev_t = arrival_curve["times"][seg]
+
+        # initial bursts 
         for flow_idx, flow in enumerate(self.flows):
-            tfa_prog += bursts[flow_idx][flow[0]] <= self.arrival_curves[fl][0]
+            initial_server = flow["path"][0]
+            initial_burst  = flow["arrival_curve"]["burst"]
+            tfa_prog += bursts[flow_idx][initial_server] <= initial_burst
 
         # Set objective function
         tfa_prog += pulp.lpSum(delays)
 
-
         ## Solve the problem
-        tfa_prog.solve(pulp.PULP_CBC_CMD(msg=False))
-        optimal_delay = []
-        for d in delays:
-            optimal_delay.append(pulp.value(d))
+        status = tfa_prog.solve(pulp.PULP_CBC_CMD(msg=False))
 
-        return optimal_delay
+        # Check solver status
+        if status < 1:
+            # The problem is not solved, show the issue
+            print(f"Problem \"{problem_name}\" is {pulp.LpStatus[status]}.")
+            return np.inf
+        else:
+            optimal_delay = []
+            for d in delays:
+                optimal_delay.append(pulp.value(d))
+
+            return optimal_delay
 
 
-    def solve_tfa_pp(self) -> list:
+    def solve_tfa_pp(self, problem_name:str="TFA++ problem") -> list:
         '''
         Solve the TFA++ problem given that the network is defined properly
 
@@ -305,9 +352,6 @@ class tsn_analyzer():
         '''
         # ensure the problem is properly defined
         assert self.adjacency_mat is not None
-        assert len(self.arrival_curves) == self.num_flows
-        assert len(self.service_curves) == self.num_servers
-        assert len(self.shapers) == self.num_servers
 
         # setup the lp problem for the TFA Linear program
         tfa_pp_prog = pulp.LpProblem('TFA++_Program', pulp.LpMaximize)
@@ -320,88 +364,136 @@ class tsn_analyzer():
         bursts     = [[None]*self.num_servers for _ in range(self.num_flows)]
 
         # for all server j
-        for server in range(self.num_servers):
+        for server_idx, server in enumerate(self.servers):
             # Time constraints
-            s_var = var_set_name('s', server)
-            t_var = var_set_name('t', server)
-            in_time[server]  = pulp.LpVariable(s_var, 0)
-            out_time[server] = pulp.LpVariable(t_var)
+            s_var = var_set_name('s', server_idx)
+            t_var = var_set_name('t', server_idx)
+            in_time[server_idx]  = pulp.LpVariable(s_var, 0)
+            out_time[server_idx] = pulp.LpVariable(t_var)
             
-            tfa_pp_prog += in_time[server] <= out_time[server]    # add constraint that s <= t
+            tfa_pp_prog += in_time[server_idx] <= out_time[server_idx]    # add constraint that s <= t
 
             # Arrival constraints
-            for fl in self.__get_flows(server):
-                As_var = var_set_name('As', fl, server)
-                x_var  = var_set_name('x' , fl, server)
-                Dt_var = var_set_name('Dt', fl, server)
-                arrivals[fl][server]   = pulp.LpVariable(As_var)
-                bursts[fl][server]     = pulp.LpVariable(x_var)
-                departures[fl][server] = pulp.LpVariable(Dt_var)
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                As_var = var_set_name('As', fl_idx, server_idx)
+                x_var  = var_set_name('x' , fl_idx, server_idx)
+                Dt_var = var_set_name('Dt', fl_idx, server_idx)
+                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var)
+                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var)
+                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var)
 
-                tfa_pp_prog += arrivals[fl][server] <= bursts[fl][server] + self.arrival_curves[fl][1]*in_time[server]
+                arrival_curve = fl["arrival_curve"]
 
-            # Service constraints
-            tfa_pp_prog += pulp.lpSum([departures[fl][server] for fl in self.__get_flows(server)]) \
-                        >= self.service_curves[server][0]*out_time[server] - self.service_curves[server][0]*self.service_curves[server][1]
-            tfa_pp_prog += pulp.lpSum([departures[fl][server] for fl in self.__get_flows(server)]) >= 0
+                tfa_pp_prog += arrivals[fl_idx][server_idx] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*in_time[server_idx]
 
-            # FIFO constraints
-            for fl in self.__get_flows(server):
-                tfa_pp_prog += arrivals[fl][server] == departures[fl][server]
+                # Deal with the extra segments of the arrival curve because of piecewise linearity
+                num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
+                cumulation = 0
+                prev_t = 0  # previous time snap
+                for seg in range(num_arrcur_seg):
+                    cumulation += (arrival_curve["times"][seg] - prev_t) * arrival_curve["rates"][seg]
+                    tfa_pp_prog += arrivals[fl_idx][server_idx] <= bursts[fl_idx][server_idx] + cumulation + arrival_curve["rates"][seg+1] * (in_time[server_idx] - arrival_curve["times"][seg])
+
+                    prev_t = arrival_curve["times"][seg]
+
+            ## Service constraints
+            service_curve = server["service_curve"]
+            tfa_pp_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) \
+                        >= service_curve["rates"][0]*out_time[server_idx] - service_curve["rates"][0]*service_curve["latency"]
+            tfa_pp_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) >= 0
+
+            # Check all segments of the piecewise linear service curve
+            num_sercur_seg = len(service_curve["times"])
+            cumulation = 0
+            prev_t = service_curve["latency"]
+            for seg in range(num_sercur_seg):
+                cumulation += service_curve["rates"][seg]*(service_curve["times"][seg] - prev_t)
+                tfa_pp_prog += pulp.lpSum([departures[fl_idx][server_idx] for _, fl_idx in self.__get_flows(server_idx, enum_iter=True)]) \
+                            >= service_curve["rates"][seg+1] * (out_time[server_idx] - service_curve["times"][seg]) + cumulation
+
+                prev_t = service_curve["times"][seg]
+
+            ## FIFO constraints
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                tfa_pp_prog += arrivals[fl_idx][server_idx] == departures[fl_idx][server_idx]
 
             # delays
-            d_var = var_set_name('d', server)
-            delays[server] = pulp.LpVariable(d_var)
+            d_var = var_set_name('d', server_idx)
+            delays[server_idx] = pulp.LpVariable(d_var)
 
-            tfa_pp_prog += delays[server] <= out_time[server] - in_time[server]
+            tfa_pp_prog += delays[server_idx] <= out_time[server_idx] - in_time[server_idx]
 
         # Constraints on burst variables (x)
         # Burst propagation
-        for server in range(self.num_servers):
-            for fl in self.__get_flows(server):
-                for succ in self.__get_successor(server):
-                    tfa_pp_prog += bursts[fl][succ] <= bursts[fl][server] + self.arrival_curves[fl][1]*delays[server]
+        for server_idx, server in enumerate(self.servers):
+            for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
+                arrival_curve = fl["arrival_curve"]
 
+                for succ in self.__get_successor(server_idx):
+                    tfa_pp_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*delays[server_idx]
+                    # Consider piecewise linear arrival curves
+                    num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
+                    cumulation = 0
+                    prev_t = 0  # previous time snap
+                    for seg in range(num_arrcur_seg):
+                        cumulation += (arrival_curve["times"][seg] - prev_t) * arrival_curve["rates"][seg]
+                        tfa_pp_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + cumulation + arrival_curve["rates"][seg+1] * (delays[server_idx] - arrival_curve["times"][seg])
+
+                        prev_t = arrival_curve["times"][seg]
+
+        # initial bursts 
         for flow_idx, flow in enumerate(self.flows):
-            tfa_pp_prog += bursts[flow_idx][flow[0]] <= self.arrival_curves[fl][0]
+            initial_server = flow["path"][0]
+            initial_burst  = flow["arrival_curve"]["burst"]
+            tfa_pp_prog += bursts[flow_idx][initial_server] <= initial_burst
 
         # Shaper constraints
         # Adding shaping constraint
-        for server in range(self.num_servers):
-            for succ in self.__get_successor(server):
-                flows_prev = set(self.__get_flows(server))
-                flows_next = set(self.__get_flows(succ))
+        for server_id, server in enumerate(self.servers):
+            for succ in self.__get_successor(server_id):
+                flows_prev = set(self.__get_flows(server_id, indices=True))
+                flows_next = set(self.__get_flows(succ, indices=True))
                 mutual_flows = list(flows_prev.intersection(flows_next))
-                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in mutual_flows) <= self.shapers[server, 0] + self.shapers[server, 1]*in_time[succ]
+                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in mutual_flows) <= server["packet_length"] + server["capacity"]*in_time[succ]
 
         # Set objective function
         tfa_pp_prog += pulp.lpSum(delays)
 
 
         ## Solve the problem
-        tfa_pp_prog.solve(pulp.PULP_CBC_CMD(msg=False))
-        optimal_delay = []
-        for d in delays:
-            optimal_delay.append(pulp.value(d))
+        status = tfa_pp_prog.solve(pulp.PULP_CBC_CMD(msg=False))
 
-        return optimal_delay
+        # Check solver status
+        if status < 1:
+            # The problem is not solved, show the issue
+            print(f"Problem \"{problem_name}\" is {pulp.LpStatus[status]}.")
+            return np.inf
+        else:
+            optimal_delay = []
+            for d in delays:
+                optimal_delay.append(pulp.value(d))
+
+            return optimal_delay
 
 
-    def __get_flows(self, server: int) -> list:
+    def __get_flows(self, server: int, enum_iter:bool=False, indices:bool=False) -> list:
         '''
         Given a server j, find the indices of flow Fl(j) that passes server j
         the answer is returned in a list
         '''
         assert len(self.flows) == self.num_flows
 
-        idx = 0
-        involved_flows = []
-        for fl in self.flows:
-            if server in fl:
-                involved_flows.append(idx)
-            idx += 1
+        output = []
+        for idx, fl in enumerate(self.flows):
+            if server in fl["path"]:
+                if enum_iter:
+                    output.append((fl, idx))
+                elif indices:
+                    output.append(idx)
+                else:
+                    output.append(fl)
 
-        return involved_flows
+        return output
 
     def __get_successor(self, server: int) -> list:
         '''
@@ -413,4 +505,3 @@ class tsn_analyzer():
             return []
         else:
             return list(np.argwhere(self.adjacency_mat[server])[0])
-
