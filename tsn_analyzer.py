@@ -44,6 +44,9 @@ class tsn_analyzer():
 
         self.servers = []
 
+        # For debug
+        self.solver = None
+
         if filename is not None:
             self.load(filename)
 
@@ -54,30 +57,37 @@ class tsn_analyzer():
         '''
         with open(filename) as f:
             network_def = json.load(f)
-            # A network_def object should contain
-            #
-            # 1. adjacency matrix:
-            #  - a 2D array representing a directed graph
-            #
-            # 2. flows:
-            #  - a list of objects representing each flow.
-            #    a flow is defined by
-            #    - path: a list of non-repeating indicing of servers
-            #    - packet_length: max packet size arrives at this flow
-            #    - arrival_curve: an object defines a concave curve and contains
-            #      - burst: a number indicates initial burst
-            #      - times: list of time snapshots where the curve changes slopes
-            #      - rates: a decreasing list of arrival rates w.r.t. "times"
-            #
-            # 3. servers:
-            #  - a list of objects representing each server.
-            #    a server is defined by
-            #    - name: the name of the server
-            #    - capacity: the output capacity of server (shaper constraint)
-            #    - service_curve: an object defines a convex curve and contains
-            #      - latency: a number indicates the initial latency
-            #      - times: list of time snapshots where the curve changes slopes
-            #      - rates: a increasing list of service rates w.r.t. "times"
+            
+        self.parse(network_def)
+
+
+    def parse(self, network_def:dict) -> None:
+        '''
+        A network_def object should contain
+        
+        1. adjacency matrix:
+         - a 2D array representing a directed graph
+        
+        2. flows:
+         - a list of objects representing each flow.
+           a flow is defined by
+           - path: a list of non-repeating indicing of servers
+           - packet_length: max packet size arrives at this flow
+           - arrival_curve: an object defines a concave curve and contains
+             - burst: a number indicates initial burst
+             - times: list of time snapshots where the curve changes slopes
+             - rates: a decreasing list of arrival rates w.r.t. "times"
+        
+        3. servers:
+         - a list of objects representing each server.
+           a server is defined by
+           - name: the name of the server
+           - capacity: the output capacity of server (shaper constraint)
+           - service_curve: an object defines a convex curve and contains
+             - latency: a number indicates the initial latency
+             - times: list of time snapshots where the curve changes slopes
+             - rates: a increasing list of service rates w.r.t. "times"
+        '''
 
         ## Load adjacency matrix
         self.adjacency_mat = np.array(network_def['adjacency_matrix'])
@@ -245,8 +255,8 @@ class tsn_analyzer():
             # Time constraints
             s_var = var_set_name('s', server_idx)
             t_var = var_set_name('t', server_idx)
-            in_time[server_idx]  = pulp.LpVariable(s_var, 0)
-            out_time[server_idx] = pulp.LpVariable(t_var)
+            in_time[server_idx]  = pulp.LpVariable(s_var, lowBound=0)
+            out_time[server_idx] = pulp.LpVariable(t_var, lowBound=0)
             
             tfa_prog += in_time[server_idx] <= out_time[server_idx]    # add constraint that s <= t
 
@@ -255,9 +265,9 @@ class tsn_analyzer():
                 As_var = var_set_name('As', fl_idx, server_idx)
                 x_var  = var_set_name('x' , fl_idx, server_idx)
                 Dt_var = var_set_name('Dt', fl_idx, server_idx)
-                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var)
-                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var)
-                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var)
+                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var, lowBound=0)
+                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var, lowBound=0)
+                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var, lowBound=0)
 
                 arrival_curve = fl["arrival_curve"]
 
@@ -296,7 +306,7 @@ class tsn_analyzer():
 
             # delays
             d_var = var_set_name('d', server_idx)
-            delays[server_idx] = pulp.LpVariable(d_var)
+            delays[server_idx] = pulp.LpVariable(d_var, lowBound=0)
 
             tfa_prog += delays[server_idx] <= out_time[server_idx] - in_time[server_idx]
 
@@ -329,12 +339,14 @@ class tsn_analyzer():
 
         ## Solve the problem
         status = tfa_prog.solve(pulp.PULP_CBC_CMD(msg=False))
+        
+        self.solver = tfa_prog
 
         # Check solver status
         if status < 1:
             # The problem is not solved, show the issue
             print(f"Problem \"{problem_name}\" is {pulp.LpStatus[status]}.")
-            return np.inf
+            return [np.inf]
         else:
             optimal_delay = []
             for d in delays:
@@ -368,8 +380,8 @@ class tsn_analyzer():
             # Time constraints
             s_var = var_set_name('s', server_idx)
             t_var = var_set_name('t', server_idx)
-            in_time[server_idx]  = pulp.LpVariable(s_var, 0)
-            out_time[server_idx] = pulp.LpVariable(t_var)
+            in_time[server_idx]  = pulp.LpVariable(s_var, lowBound=0)
+            out_time[server_idx] = pulp.LpVariable(t_var, lowBound=0)
             
             tfa_pp_prog += in_time[server_idx] <= out_time[server_idx]    # add constraint that s <= t
 
@@ -378,9 +390,9 @@ class tsn_analyzer():
                 As_var = var_set_name('As', fl_idx, server_idx)
                 x_var  = var_set_name('x' , fl_idx, server_idx)
                 Dt_var = var_set_name('Dt', fl_idx, server_idx)
-                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var)
-                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var)
-                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var)
+                arrivals[fl_idx][server_idx]   = pulp.LpVariable(As_var, lowBound=0)
+                bursts[fl_idx][server_idx]     = pulp.LpVariable(x_var, lowBound=0)
+                departures[fl_idx][server_idx] = pulp.LpVariable(Dt_var, lowBound=0)
 
                 arrival_curve = fl["arrival_curve"]
 
@@ -419,7 +431,7 @@ class tsn_analyzer():
 
             # delays
             d_var = var_set_name('d', server_idx)
-            delays[server_idx] = pulp.LpVariable(d_var)
+            delays[server_idx] = pulp.LpVariable(d_var, lowBound=0)
 
             tfa_pp_prog += delays[server_idx] <= out_time[server_idx] - in_time[server_idx]
 
@@ -431,6 +443,7 @@ class tsn_analyzer():
 
                 for succ in self.__get_successor(server_idx):
                     tfa_pp_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*delays[server_idx]
+                    # tfa_pp_prog += bursts[fl_idx][succ] >= bursts[fl_idx][server_idx]
                     # Consider piecewise linear arrival curves
                     num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
                     cumulation = 0
@@ -458,16 +471,18 @@ class tsn_analyzer():
 
         # Set objective function
         tfa_pp_prog += pulp.lpSum(delays)
-
+        # tfa_pp_prog += pulp.lpSum([b for sublist in bursts for b in sublist])
 
         ## Solve the problem
-        status = tfa_pp_prog.solve(pulp.PULP_CBC_CMD(msg=False))
+        status = tfa_pp_prog.solve(pulp.GLPK_CMD(msg=False))
+
+        self.solver = tfa_pp_prog
 
         # Check solver status
         if status < 1:
             # The problem is not solved, show the issue
             print(f"Problem \"{problem_name}\" is {pulp.LpStatus[status]}.")
-            return np.inf
+            return [np.inf]
         else:
             optimal_delay = []
             for d in delays:
