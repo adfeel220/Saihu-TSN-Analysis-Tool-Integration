@@ -317,6 +317,10 @@ class tsn_analyzer():
                 arrival_curve = fl["arrival_curve"]
 
                 for succ in self.__get_successor(server_idx):
+                    # propagate only when server -> succ is in current flow
+                    if not (server_idx in fl["path"] and succ in fl["path"]):
+                        continue
+
                     tfa_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*delays[server_idx]
                     # Consider piecewise linear arrival curves
                     num_arrcur_seg = len(arrival_curve["times"])   # number of arrival curve segments
@@ -339,7 +343,7 @@ class tsn_analyzer():
 
         ## Solve the problem
         status = tfa_prog.solve(pulp.PULP_CBC_CMD(msg=False))
-        
+
         self.solver = tfa_prog
 
         # Check solver status
@@ -442,6 +446,10 @@ class tsn_analyzer():
                 arrival_curve = fl["arrival_curve"]
 
                 for succ in self.__get_successor(server_idx):
+                    # propagate only when server -> succ is in current flow
+                    if not (server_idx in fl["path"] and succ in fl["path"]):
+                        continue
+
                     tfa_pp_prog += bursts[fl_idx][succ] <= bursts[fl_idx][server_idx] + arrival_curve["rates"][0]*delays[server_idx]
                     # tfa_pp_prog += bursts[fl_idx][succ] >= bursts[fl_idx][server_idx]
                     # Consider piecewise linear arrival curves
@@ -467,7 +475,13 @@ class tsn_analyzer():
                 flows_prev = set(self.__get_flows(server_id, indices=True))
                 flows_next = set(self.__get_flows(succ, indices=True))
                 mutual_flows = list(flows_prev.intersection(flows_next))
-                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in mutual_flows) <= server["packet_length"] + server["capacity"]*in_time[succ]
+                # select flows only when the path "server_id -> succ" is in the flow
+                seq_flows = []
+                for fl_idx in mutual_flows:
+                    if self.flows[fl_idx]["path"].index(server_id)+1 == self.flows[fl_idx]["path"].index(succ):
+                        seq_flows.append(fl_idx)
+
+                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in seq_flows) <= server["packet_length"] + server["capacity"]*in_time[succ]
 
         # Set objective function
         tfa_pp_prog += pulp.lpSum(delays)
