@@ -42,7 +42,7 @@ if sum(optimal_delay_shapers) < np.inf:
 print("-----------------------------")
 print("Fig. 25: ring network")
 network_def_dir = "./networks/ring.json"
-generate_ring(size=10,
+generate_ring(size=7,
               burst=1, arr_rate=1, pkt_leng=0,
               latency=1, ser_rate=10, capacity=10,
               dir=network_def_dir)

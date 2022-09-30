@@ -2,7 +2,7 @@
     "adjacency_matrix":
     [
         [0, 1],
-        [1, 0]
+        [0, 0]
     ],
 
     "flows":
@@ -10,26 +10,23 @@
         {
             "path": [0, 1],
             "arrival_curve": {
-                "burst": 1,
-                "times": [],
-                "rates": [1]
+                "bursts": [1, 2, 3],
+                "rates": [1, 0.8, 0.7]
             },
             "packet_length": 0
         },
         {
             "path": [0],
             "arrival_curve": {
-                "burst": 1,
-                "times": [],
-                "rates": [1]
+                "bursts": [1, 2, 3],
+                "rates": [1, 0.5, 0.2]
             },
             "packet_length": 0
         },
         {
             "path": [1],
             "arrival_curve": {
-                "burst": 1,
-                "times": [],
+                "bursts": [1],
                 "rates": [1]
             },
             "packet_length": 0
@@ -39,22 +36,18 @@
     "servers":
     [
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
-                "rates": [4]
+                "latencies": [1, 1.1, 1.2],
+                "rates": [4, 10, 100]
             },
-            "capacity": 4
+            "capacity": 200
         },
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
-                "rates": [4]
+                "latencies": [1, 1.1, 1.2],
+                "rates": [4, 10, 100]
             },
-            "capacity": 4
+            "capacity": 200
         }
     ]
 }

@@ -38,8 +38,7 @@ def generate_interleaved_tandem(size:int, burst:float, arr_rate:float, pkt_leng:
     through_flow = {
         "path": list(range(size)),
         "arrival_curve": {
-            "burst": burst,
-            "times": [],
+            "bursts": [burst],
             "rates": [arr_rate]
         },
         "packet_length": pkt_leng
@@ -50,8 +49,7 @@ def generate_interleaved_tandem(size:int, burst:float, arr_rate:float, pkt_leng:
         flows[flow_idx] = {
             "path": [flow_idx-1, flow_idx],
             "arrival_curve": {
-                "burst": burst,
-                "times": [],
+                "bursts": [burst],
                 "rates": [arr_rate]
             },
             "packet_length": pkt_leng
@@ -61,10 +59,8 @@ def generate_interleaved_tandem(size:int, burst:float, arr_rate:float, pkt_leng:
     servers = [None]*size
     for server_idx in range(size):
         servers[server_idx] = {
-            "name": "",
             "service_curve": {
-                "latency": latency,
-                "times": [],
+                "latencies": [latency],
                 "rates": [ser_rate]
             },
             "capacity": capacity
@@ -122,8 +118,7 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
         flows[flow_idx] = {
             "path": path,
             "arrival_curve": {
-                "burst": burst,
-                "times": [],
+                "bursts": [burst],
                 "rates": [arr_rate]
             },
             "packet_length": pkt_leng
@@ -133,10 +128,8 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
     servers = [None]*size
     for server_idx in range(size):
         servers[server_idx] = {
-            "name": "",
             "service_curve": {
-                "latency": latency,
-                "times": [],
+                "latencies": [latency],
                 "rates": [ser_rate]
             },
             "capacity": capacity
