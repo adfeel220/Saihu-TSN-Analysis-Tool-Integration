@@ -2,32 +2,12 @@ import warnings
 import numpy as np
 import pulp
 import json
+from util import *
 
 from typing import List, Union
 
-## Helper functions
-def var_set_name(name: str, *indices) -> str:
-    '''
-    Format the variable name. For example,
-    base name: 'x', indices are 1 and 2, then the name is set as 'x_1,2'
-    '''
-    name += '_'
-    for idx in indices:
-        name += str(idx) + ','
-
-    return name[:-1]
-
-def var_get_name(name: str) -> tuple:
-    '''
-    Obtain the base name and indices from the formated variable name. For example,
-    "x_1,2" -> ('x', [1,2])
-    '''
-    base_name, indices = name.split('_')
-    indices = indices.split(',')
-    indices = [int(idx) for idx in indices]
-    
-    return base_name, indices
-
+# set custom warning message
+warnings.showwarning = warning_override
 
 ## Class Definition
 class tsn_analyzer():
@@ -43,6 +23,7 @@ class tsn_analyzer():
         self.num_flows = 0
 
         self.servers = []
+        self.server_no_flow = set() # server without any flow passes through it, need to exclude from problem otherwise the problem is unbounded
 
         # For debug
         self.solver = None
@@ -94,7 +75,7 @@ class tsn_analyzer():
         '''
 
         ## Load adjacency matrix
-        self.adjacency_mat = np.array(network_def['adjacency_matrix'])
+        self.adjacency_mat = np.array(network_def['adjacency_matrix'], dtype=np.int8)
         self.num_servers   = self.adjacency_mat.shape[0]
         # Assert the input is a valid adjacency matrix
         if len(self.adjacency_mat.shape) != 2:
@@ -119,6 +100,10 @@ class tsn_analyzer():
             for s in path:
                 if s >= self.num_servers or s < 0:
                     raise SyntaxError(f"Path definition in flow {id} is incorrect. Server ID should be 0-{self.num_servers-1}, get {s} instead.")
+            # 3. Each adjacent servers along the path is connected by a link
+            for si in range(len(path)-1):
+                if self.adjacency_mat[path[si], path[si+1]] == 0:
+                    raise ValueError(f"Path of flow {id} invalid. No link between server {path[si]} and {path[si+1]}")
 
             ## Check arrival curve syntax
             arrival_curve = fl["arrival_curve"]
@@ -143,7 +128,13 @@ class tsn_analyzer():
             ## Assign packet length according to flow paths
             pkt_len = [fl["packet_length"] for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
             # Assign the maximum possible packet length that passes through the server
-            ser['packet_length'] = max(pkt_len)
+            if len(pkt_len) > 0:
+                ser['packet_length'] = max(pkt_len)
+            # it's possible that exists isolated server
+            else:
+                warnings.warn(f"No flow passes through server {ser_id}, you may remove it from the analysis", UserWarning)
+                self.server_no_flow.add(ser_id)
+                ser['packet_length'] = 0
 
             ## Check service curve
             # assertion of arrival curve definition
@@ -284,15 +275,16 @@ class tsn_analyzer():
         # setup the lp problem for the TFA Linear program
         tfa_prog = pulp.LpProblem('TFA_Program', pulp.LpMaximize)
         # variables
-        in_time    = [None]*self.num_servers
-        out_time   = [None]*self.num_servers
-        delays     = [None]*self.num_servers
-        arrivals   = [[None]*self.num_servers for _ in range(self.num_flows)]
-        departures = [[None]*self.num_servers for _ in range(self.num_flows)]
-        bursts     = [[None]*self.num_servers for _ in range(self.num_flows)]
+        in_time    = [0]*self.num_servers
+        out_time   = [0]*self.num_servers
+        delays     = [0]*self.num_servers
+        arrivals   = [[0]*self.num_servers for _ in range(self.num_flows)]
+        departures = [[0]*self.num_servers for _ in range(self.num_flows)]
+        bursts     = [[0]*self.num_servers for _ in range(self.num_flows)]
 
         # for all server j
         for server_idx, server in enumerate(self.servers):
+
             # Time constraints
             s_var = var_set_name('s', server_idx)
             t_var = var_set_name('t', server_idx)
@@ -349,11 +341,17 @@ class tsn_analyzer():
             d_var = var_set_name('d', server_idx)
             delays[server_idx] = pulp.LpVariable(d_var, lowBound=0)
 
+            # Only compute server with flow passes through, otherwise the delay is unbounded
+            if server_idx in self.server_no_flow:
+                tfa_prog += delays[server_idx] == 0
+                continue
+
             tfa_prog += delays[server_idx] <= out_time[server_idx] - in_time[server_idx]
 
         # Constraints on burst variables (x)
         # Burst propagation
         for server_idx, server in enumerate(self.servers):
+
             for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
                 arrival_curve = fl["arrival_curve"]
 
@@ -413,15 +411,19 @@ class tsn_analyzer():
         # setup the lp problem for the TFA Linear program
         tfa_pp_prog = pulp.LpProblem('TFA++_Program', pulp.LpMaximize)
         # variables
-        in_time    = [None]*self.num_servers
-        out_time   = [None]*self.num_servers
-        delays     = [None]*self.num_servers
-        arrivals   = [[None]*self.num_servers for _ in range(self.num_flows)]
-        departures = [[None]*self.num_servers for _ in range(self.num_flows)]
-        bursts     = [[None]*self.num_servers for _ in range(self.num_flows)]
+        in_time    = [0]*self.num_servers
+        out_time   = [0]*self.num_servers
+        delays     = [0]*self.num_servers
+        arrivals   = [[0]*self.num_servers for _ in range(self.num_flows)]
+        departures = [[0]*self.num_servers for _ in range(self.num_flows)]
+        bursts     = [[0]*self.num_servers for _ in range(self.num_flows)]
 
         # for all server j
         for server_idx, server in enumerate(self.servers):
+            # Only compute server with flow passes through, otherwise the delay is unbounded
+            if server_idx in self.server_no_flow:
+                continue
+
             # Time constraints
             s_var = var_set_name('s', server_idx)
             t_var = var_set_name('t', server_idx)
@@ -483,6 +485,10 @@ class tsn_analyzer():
         # Constraints on burst variables (x)
         # Burst propagation
         for server_idx, server in enumerate(self.servers):
+            # Only compute server with flow passes through, otherwise the delay is unbounded
+            if server_idx in self.server_no_flow:
+                continue
+
             for fl, fl_idx in self.__get_flows(server_idx, enum_iter=True):
                 arrival_curve = fl["arrival_curve"]
 
@@ -512,6 +518,10 @@ class tsn_analyzer():
         # Shaper constraints
         # Adding shaping constraint
         for server_id, server in enumerate(self.servers):
+            # Only compute server with flow passes through, otherwise the delay is unbounded
+            if server_idx in self.server_no_flow:
+                continue
+
             for succ in self.__get_successor(server_id):
                 flows_prev = set(self.__get_flows(server_id, indices=True))
                 flows_next = set(self.__get_flows(succ, indices=True))
@@ -574,7 +584,7 @@ class tsn_analyzer():
         if len(succ) == 0:
             return []
         else:
-            return list(np.argwhere(self.adjacency_mat[server])[0])
+            return np.argwhere(self.adjacency_mat[server])[:,0].tolist()
 
 
     def assert_arrival_curve(self, arrival_curve:dict, flow_id:int) -> None:
@@ -594,7 +604,7 @@ class tsn_analyzer():
         # Check number of segments of the arrival curve coherent in bursts/rates
         min_len = min(bursts_len, rates_len)
         if bursts_len != rates_len:
-            warnings.warn(f"\nLength of bursts and arrival rates are different in flow {flow_id}. {bursts_len} numbers in bursts' definition and {rates_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
+            warnings.warn(f"Length of bursts and arrival rates are different in flow {flow_id}. {bursts_len} numbers in bursts' definition and {rates_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
             arrival_curve["bursts"] = arrival_curve["bursts"][:min_len]
             arrival_curve["rates"]  = arrival_curve["rates"][:min_len]
 
@@ -643,7 +653,7 @@ class tsn_analyzer():
         # Check number of segments of the service curve coherent in latencies/rates
         min_len = min(lat_len, rate_len)
         if lat_len != rate_len:
-            warnings.warn(f"\nLength of latencies and services rates are different in server {server_id}. {lat_len} numbers in latencies' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
+            warnings.warn(f"Length of latencies and services rates are different in server {server_id}. {lat_len} numbers in latencies' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
             service_curve["latencies"] = service_curve["latencies"][:min_len]
             service_curve["rates"]     = service_curve["rates"][:min_len]
 

@@ -2,9 +2,16 @@
     "adjacency_matrix": [
         [
             0.0,
+            1.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
             1.0
         ],
         [
+            0.0,
             0.0,
             0.0
         ]
@@ -13,13 +20,15 @@
         {
             "path": [
                 0,
-                1
+                1,
+                2
             ],
             "arrival_curve": {
-                "burst": 0.5,
-                "times": [],
+                "bursts": [
+                    1
+                ],
                 "rates": [
-                    0.5
+                    1
                 ]
             },
             "packet_length": 0
@@ -30,10 +39,26 @@
                 1
             ],
             "arrival_curve": {
-                "burst": 0.5,
-                "times": [],
+                "bursts": [
+                    1
+                ],
                 "rates": [
-                    0.5
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                1,
+                2
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
                 ]
             },
             "packet_length": 0
@@ -41,10 +66,10 @@
     ],
     "servers": [
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
+                "latencies": [
+                    1
+                ],
                 "rates": [
                     4
                 ]
@@ -52,10 +77,21 @@
             "capacity": 4
         },
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    4
+                ]
+            },
+            "capacity": 4
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
                 "rates": [
                     4
                 ]

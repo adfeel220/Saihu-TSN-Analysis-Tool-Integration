@@ -2,10 +2,65 @@
     "adjacency_matrix": [
         [
             0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+        ],
+        [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
             1.0
         ],
         [
             1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
             0.0
         ]
     ],
@@ -13,11 +68,17 @@
         {
             "path": [
                 0,
-                1
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
             ],
             "arrival_curve": {
-                "burst": 1,
-                "times": [],
+                "bursts": [
+                    1
+                ],
                 "rates": [
                     1
                 ]
@@ -27,11 +88,117 @@
         {
             "path": [
                 1,
+                2,
+                3,
+                4,
+                5,
+                6,
                 0
             ],
             "arrival_curve": {
-                "burst": 1,
-                "times": [],
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                2,
+                3,
+                4,
+                5,
+                6,
+                0,
+                1
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                3,
+                4,
+                5,
+                6,
+                0,
+                1,
+                2
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                4,
+                5,
+                6,
+                0,
+                1,
+                2,
+                3
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                5,
+                6,
+                0,
+                1,
+                2,
+                3,
+                4
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
+                "rates": [
+                    1
+                ]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [
+                6,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "arrival_curve": {
+                "bursts": [
+                    1
+                ],
                 "rates": [
                     1
                 ]
@@ -41,10 +208,10 @@
     ],
     "servers": [
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
+                "latencies": [
+                    1
+                ],
                 "rates": [
                     10
                 ]
@@ -52,10 +219,65 @@
             "capacity": 10
         },
         {
-            "name": "",
             "service_curve": {
-                "latency": 1,
-                "times": [],
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    10
+                ]
+            },
+            "capacity": 10
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    10
+                ]
+            },
+            "capacity": 10
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    10
+                ]
+            },
+            "capacity": 10
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    10
+                ]
+            },
+            "capacity": 10
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
+                "rates": [
+                    10
+                ]
+            },
+            "capacity": 10
+        },
+        {
+            "service_curve": {
+                "latencies": [
+                    1
+                ],
                 "rates": [
                     10
                 ]

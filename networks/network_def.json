@@ -10,16 +10,16 @@
         {
             "path": [0, 1],
             "arrival_curve": {
-                "bursts": [1, 2, 3],
-                "rates": [1, 0.8, 0.7]
+                "bursts": [1],
+                "rates": [1]
             },
             "packet_length": 0
         },
         {
             "path": [0],
             "arrival_curve": {
-                "bursts": [1, 2, 3],
-                "rates": [1, 0.5, 0.2]
+                "bursts": [1],
+                "rates": [1]
             },
             "packet_length": 0
         },
@@ -37,17 +37,17 @@
     [
         {
             "service_curve": {
-                "latencies": [1, 1.1, 1.2],
-                "rates": [4, 10, 100]
+                "latencies": [1],
+                "rates": [4]
             },
-            "capacity": 200
+            "capacity": 4
         },
         {
             "service_curve": {
-                "latencies": [1, 1.1, 1.2],
-                "rates": [4, 10, 100]
+                "latencies": [1],
+                "rates": [4]
             },
-            "capacity": 200
+            "capacity": 4
         }
     ]
 }
