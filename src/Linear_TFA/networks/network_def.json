@@ -1,0 +1,53 @@
+{
+    "adjacency_matrix":
+    [
+        [0, 1],
+        [0, 0]
+    ],
+
+    "flows":
+    [
+        {
+            "path": [0, 1],
+            "arrival_curve": {
+                "bursts": [1],
+                "rates": [1]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [0],
+            "arrival_curve": {
+                "bursts": [1],
+                "rates": [1]
+            },
+            "packet_length": 0
+        },
+        {
+            "path": [1],
+            "arrival_curve": {
+                "bursts": [1],
+                "rates": [1]
+            },
+            "packet_length": 0
+        }
+    ],
+
+    "servers":
+    [
+        {
+            "service_curve": {
+                "latencies": [1],
+                "rates": [4]
+            },
+            "capacity": 4
+        },
+        {
+            "service_curve": {
+                "latencies": [1],
+                "rates": [4]
+            },
+            "capacity": 4
+        }
+    ]
+}
