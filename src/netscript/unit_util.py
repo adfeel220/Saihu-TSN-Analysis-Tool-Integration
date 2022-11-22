@@ -1,4 +1,7 @@
+from typing import Iterable
 
+MAX_MULTIPLIER = "E"
+MIN_MULTIPLIER = "a"
 
 multipliers = {
     'a': 1e-18, # atto
@@ -7,12 +10,29 @@ multipliers = {
     'n': 1e-9,  # nano
     'u': 1e-6,  # micro
     'm': 1e-3,  # milli
+    '' : 1,
     'k': 1e3,   # kilo
     'M': 1e6,   # Mega
     'G': 1e9,   # Giga
     'T': 1e12,  # Tera
-    "P": 1e15,  # Peta
-    "E": 1e18   # Exa
+    'P': 1e15,  # Peta
+    'E': 1e18   # Exa
+}
+
+multiplier_names = {
+    'a': 'atto',
+    'f': 'femto',
+    'p': 'pico',
+    'n': 'nano',
+    'u': 'micro',
+    'm': 'milli',
+    '' : '',
+    'k': 'kilo',
+    'M': 'Mega',
+    'G': 'Giga',
+    'T': 'Tera',
+    'P': 'Peta',
+    'E': 'Exa'
 }
 
 time_units = {
@@ -272,6 +292,20 @@ def decide_multiplier(x:float)->tuple:
 
     # None of above cases fit, best with no multiplier
     return x, ''
+
+
+def decide_min_multiplier(x:Iterable)->str:
+    '''
+    Determine the minimum multiplier among a list of values
+    '''
+    min_mul = MAX_MULTIPLIER
+    for elem in x:
+        new_num, mul = decide_multiplier(elem)
+        if multipliers[mul] < multipliers[min_mul]:
+            min_mul = mul
+
+    return min_mul
+
 
 if __name__ == "__main__":
     # print(parse_num_unit_rate("123"))

@@ -16,6 +16,7 @@ class TSN_result():
     max_backlog     : float
     flow_paths      : dict
     flow_cmu_delays : dict
+    flow_delays     : dict
     exec_time       : float
 
     def __init__(self, **kargs) -> None:
@@ -34,7 +35,8 @@ class TSN_result():
         self._max_backlog = kargs.get("max_backlog", None)
 
         self._flow_paths = kargs.get("flow_paths", None)
-        self._flow_cmu_delays = kargs.get("flow_delays", None)
+        self._flow_cmu_delays = kargs.get("flow_cmu_delays", None)
+        self._flow_delays = kargs.get("flow_delays", None)
 
         self._exec_time = kargs.get("exec_time", None)
 
@@ -107,6 +109,10 @@ class TSN_result():
     @property
     def flow_cmu_delays(self)->dict:
         return self._flow_cmu_delays
+
+    @property
+    def flow_delays(self)->dict:
+        return self._flow_delays
 
     @property
     def exec_time(self)->int:

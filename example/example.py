@@ -6,5 +6,5 @@ from interface import TSN_Analyzer
 
 if __name__ == "__main__":
     analyzer = TSN_Analyzer("./demo.json", temp_path="./temp/")
-    analyzer.analyze_all(methods=["TFA"])
+    analyzer.analyze_all(methods=["TFA", "PLP++"])
     analyzer.write_result("./demo_report.md")
