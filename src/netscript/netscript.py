@@ -4,6 +4,7 @@ import xml.dom.minidom as md
 import json
 from copy import deepcopy
 import numpy as np
+from typing import Union
 
 # Solve path issue
 import os.path
@@ -168,7 +169,11 @@ class NetworkScriptHandler:
         Inputs:
         ---------
         ifpath: input file path  (str)
-        ofpath: output file path (str)
+        ofpath: (Optional) output file path (str). Default = None means no output, return json as a python dictionary directly
+
+        Returns:
+        ---------
+        json_out : [dict] the converted output-port network as if loaded from a json file
         '''
         # Ensure extension
         ifpath = check_file_ext(ifpath, 'xml')
@@ -242,7 +247,7 @@ class NetworkScriptHandler:
         
         # Dump file
         json_out = {
-            "network": self.phy_net.network,
+            "network": {"converted":ifpath, **self.phy_net.network},
             "adjacency_matrix": adjacency_matrix,
             "flows": flows,
             "servers": servers
@@ -277,7 +282,8 @@ class NetworkScriptHandler:
 
         ## General network information
         network_info = deepcopy(self.op_net.network_info)
-        network_info["technology"] = "+".join(network_info["technology"])
+        network_info["technology"] = "+".join(network_info.get("technology", ["FIFO"]))
+        network_info["converted"] = ifpath
         network_info = ET.SubElement(root, "network", network_info)
 
         ######################################
@@ -434,7 +440,40 @@ class NetworkScriptHandler:
         raise NotImplementedError()
 
 
-if __name__ == "__main__":
-    nsh = NetworkScriptHandler()
-    # nsh.phynet_to_opnet_json("ring-test.xml", "test.json")
-    nsh.opnet_json_to_phynet("test.json", "test.xml")
+    def get_network_info(self, filename:str, target_attr:str, default=None):
+        '''
+        Get a certain attribute from a file, return None if not found
+        '''
+        if filename.endswith("xml"):
+            # Load the information
+            xml_root = ET.parse(filename)
+            net = PhysicalNet()
+            net.parse_network(xml_root)
+            
+            return net.network.get(target_attr, default)
+
+        elif filename.endswith("json"):
+            # Load the information
+            with open(filename, 'r') as ifile:
+                network_def = json.load(ifile)
+                if "network" not in network_def:
+                    return default
+                return network_def["network"].get(target_attr, default)
+
+        return default
+
+    
+    def get_network_utility(self, filename:str) -> dict:
+        '''
+        Obtain network load (utility) for each server
+        '''
+        if filename.endswith(".xml"):
+            network_def = self.phynet_to_opnet_json(filename)
+            opnet = OutputPortNet(network_def=network_def)
+        elif filename.endswith(".json"):
+            opnet = OutputPortNet(ifile=filename)
+        else:
+            raise ValueError("File type of network description file \"{fn}\" not supported".format(fn=filename))
+
+        return opnet.get_utility()
+        

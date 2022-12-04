@@ -12,6 +12,16 @@ warnings.showwarning = warning_override
 ## Class Definition
 class Linear_TFA():
 
+    network_info   : dict
+    adjacency_mat  : np.ndarray
+    num_servers    : int
+    num_flows      : int
+    flows          : list
+    servers        : list
+    server_no_flow : set
+    shaper_defined : bool
+    solver         : pulp.LpProblem
+
 
     def __init__(self, filename:str=None) -> None:
         # General network information
@@ -28,7 +38,9 @@ class Linear_TFA():
         self.servers = []
         self.server_no_flow = set() # server without any flow passes through it, need to exclude from problem otherwise the problem is unbounded
 
-        # For debug
+        self.shaper_defined = True
+
+        # The linear solver used to solve the problem
         self.solver = None
 
         if filename is not None:
@@ -131,13 +143,13 @@ class Linear_TFA():
         for ser_id, ser in enumerate(network_def["servers"]):
 
             ## Assign packet length according to flow paths
-            pkt_len = [fl["packet_length"] for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
+            pkt_len = [fl.get("packet_length", 0) for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
             # Assign the maximum possible packet length that passes through the server
             if len(pkt_len) > 0:
                 ser['packet_length'] = max(pkt_len)
             # it's possible that exists isolated server
             else:
-                warnings.warn(f"No flow passes through server {ser_id}, you may remove it from the analysis", UserWarning)
+                warnings.warn(f"No flow passes through server {ser_id}, you may remove it from the analysis", RuntimeWarning)
                 self.server_no_flow.add(ser_id)
                 ser['packet_length'] = 0
 
@@ -148,8 +160,11 @@ class Linear_TFA():
             self.__set_sercur_times(ser["service_curve"])
 
             ## Check server capacity
+            # Turn off shaper if any of the server doesn't have shaper
+            if "capacity" not in ser:
+                self.shaper_defined = False
             if ser["capacity"] <= 0:
-                raise ValueError(f"Capacity of server {ser_id} is non-positive, should at least >0.")
+                warnings.warn(f"Capacity of server {ser_id} is non-positive, should at least >0. Ignore using shaper.", RuntimeWarning)
 
             self.servers.append(ser.copy())
             
@@ -267,6 +282,19 @@ class Linear_TFA():
 
             self.adjacency_mat = np.copy(new_adj_mat)
 
+
+    def solve(self) -> list:
+        '''
+        Solve the problem given that the network is defined properly,
+        Use shaper if shaper is defined
+
+        Returns:
+        delays: array of delay bounds at each server
+        '''
+        if self.shaper_defined:
+            return self.solve_tfa_pp()
+        else:
+            return self.solve_tfa()
 
 
     def solve_tfa(self, problem_name:str="TFA problem") -> list:
@@ -412,6 +440,8 @@ class Linear_TFA():
         '''
         # ensure the problem is properly defined
         assert self.adjacency_mat is not None
+        if not self.shaper_defined:
+            raise RuntimeError("Shaper is not defined while trying to solve a TFA with shaper")
 
         # setup the lp problem for the TFA Linear program
         tfa_pp_prog = pulp.LpProblem('TFA++_Program', pulp.LpMaximize)

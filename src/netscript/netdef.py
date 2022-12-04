@@ -230,16 +230,31 @@ class OutputPortNet:
     servers : list
     flows   : list
 
-    def __init__(self):
+    def __init__(self, ifile:str=None, network_def:dict=None):
         self.network_info  = dict() # general network information
         self.adjacency_mat = None   # adjacency matrix
         self.servers = list()
         self.flows = list()
 
+        if network_def is not None:
+            self.parse(network_def)
+            return
+        if ifile is not None:
+            self.read(ifile)
+
     def read(self, ifpath:str)->None:
         '''
-        Read from input file path.
-        A json object from file should contain
+        Read from a input file in json format
+        '''
+        ## Read from file
+        with open(ifpath, 'r') as ifile:
+            network_def = json.load(ifile)
+
+        self.parse(network_def)
+
+    def parse(self, network_def:dict)->None:
+        '''
+        Read from a dictionary loaded from json
 
         0. network information:
          - a dict stores general network information
@@ -264,14 +279,10 @@ class OutputPortNet:
              - latencies: a list indicates latencies of curves
              - rates: a increasing list of service rates
         '''
-        ## Read from file
-        with open(ifpath, 'r') as ifile:
-            network_def = json.load(ifile)
-            
         ## Load network information
         if "network" not in network_def:
             default_net_info = {
-                "name": ifpath.rsplit('/')[-1] or ifile,
+                "name": "NONAME",
                 "technology": ["FIFO"]
             }
             network_def["network"] = default_net_info
@@ -319,8 +330,6 @@ class OutputPortNet:
                 raise ValueError(f"Packet length of flow {id} is negative ({pkt_len}), should at least >= 0.")
 
             self.flows.append(fl.copy())
-
-        num_flows = len(self.flows)
 
         ## Load servers
         self.servers = []
@@ -394,8 +403,28 @@ class OutputPortNet:
         '''
         return len(list(nx.simple_cycles(self.get_gif()))) > 0
 
+    def get_utility(self) -> dict:
+        '''
+        Compute the utility map of network utility (load).
+        Load of each server i is computed as (sum of arrival rates at server i) / (service rate at server i)
 
-if __name__ == "__main__":
-    opnet = OutputPortNet()
-    opnet.read("test.json")
-    print(opnet.is_cyclic())
+        Returns:
+        ---------
+        utility : dictionary of key=server-names ; value=utility
+        '''
+        # aggregate arrival rate at each server, key=server_name, value=rate
+        agg_arr_rate = np.zeros(len(self.servers))
+
+        for fl in self.flows:
+            for ser_id in fl["path"]:
+                agg_arr_rate[ser_id] += fl["arrival_curve"]["rates"][0]
+
+        ser_rates = np.zeros(len(self.servers))
+        ser_names = [None]*len(self.servers)
+        for idx, serv in enumerate(self.servers):
+            ser_rates[idx] = serv["service_curve"]["rates"][0]
+            ser_names[idx] = serv.get("name", f"s_{idx}")
+
+        utility = dict(zip(ser_names, agg_arr_rate/ser_rates))
+        
+        return utility

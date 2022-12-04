@@ -61,7 +61,8 @@ def is_number(num_str:str) -> bool:
 
 def get_rate_unit(unit:str) -> float:
     '''
-    Check if it's a valid rate unit derived from time and data units
+    Check if it's a valid rate unit derived from time and data units.
+    It must be 3 characters long as "{data unit}p{time unit}". For example "bps" stands for "bits-per-second"
     '''
     if len(unit) != 3:
         raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())};\
@@ -87,16 +88,23 @@ def get_rate_unit(unit:str) -> float:
 
 def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
     '''
-    Parse the number string with unit to a number in target unit.
+    Parse the number string with unit to a number in target unit. Default converting into 'second'
     For example:
-    >>> numstr = "10ms"
-    >>> parse_unit_time(numstr, 's')
+    >>> parse_num_unit_time("10ms", 's')
     0.01
+    >>> parse_num_unit_time("60ks", 'm')
+    1000
+    >>> parse_num_unit_time("3us")
+    3e-6
 
     Inputs:
     --------
     numstr: string with number and unit
-    target_unit: string specify a unit
+    target_unit: (Optional) string specify a unit
+
+    Outputs:
+    --------
+    target_number: the value in target unit
     '''
     
     if is_number(numstr):
@@ -149,16 +157,23 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
 
 def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     '''
-    Parse the number string with unit to a number in target unit.
+    Parse the number string with unit to a number in target unit. Default converting into 'bits'
     For example:
-    >>> numstr = "10kb"
-    >>> parse_unit_data(numstr, 'b')
+    >>> parse_num_unit_data("10kb", 'b')
     1000
+    >>> parse_num_unit_data("80Mb", 'B')
+    1e7
+    >>> parse_num_unit_data("2GB")
+    1.6e10
 
     Inputs:
     --------
     numstr: string with number and unit
-    target_unit: string specify a unit
+    target_unit: (Optional) string specify a unit
+
+    Outputs:
+    --------
+    target_number: the value in target unit
     '''
     
     if is_number(numstr):
@@ -215,16 +230,23 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
 
 def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
     '''
-    Parse the number string with unit to a number in target unit.
+    Parse the number string with unit to a number in target unit. Default converting into 'bps'
     For example:
-    >>> numstr = "1kbps"
-    >>> parse_unit_rate(numstr, 'bps')
+    >>> parse_num_unit_rate("1kbps", 'bps')
     1000
+    >>> parse_num_unit_rate("8MBps", 'bpm')
+    6e7
+    >>> parse_num_unit_rate("2kBps")
+    1.6e4
 
     Inputs:
     --------
     numstr: string with number and unit
-    target_unit: string specify a unit
+    target_unit: (Optional) string specify a unit
+
+    Outputs:
+    --------
+    target_number: the value in target unit
     '''
     
     if is_number(numstr):
@@ -274,7 +296,23 @@ def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
 def decide_multiplier(x:float)->tuple:
     '''
     Choose the best multiplier from input number
+    Example:
+    >>> decide_multiplier(1000)
+    1.0, 'k'
+    >>> decide_multiplier(0.01)
+    10.0, 'm'
+
+    Input:
+    --------
+    x : the number you want to decide
+
+    Outputs:
+    --------
+    new_x : the new value that should be used with the assigned multiplier
+    mul : the assigned multiplier
     '''
+    if x is None:
+        return None, None
     if x == 0:
         return x, ''
 
@@ -297,26 +335,29 @@ def decide_multiplier(x:float)->tuple:
 def decide_min_multiplier(x:Iterable)->str:
     '''
     Determine the minimum multiplier among a list of values
+    Example:
+    >>> decide_min_multiplier([10, 0.1, 200])
+    'm'
+    >>> decide_min_multiplier([2e3, 5e3, 1e8])
+    'k'
+
+    Input:
+    -------
+    x : [Iterable] an interable where all elements are numbers
+
+    Output:
+    -------
+    min_mul : the minimum suitable multiplier for all elements in x
     '''
+    if all([elem is None for elem in x]):
+        return ''
     min_mul = MAX_MULTIPLIER
     for elem in x:
+        if elem is None:
+            continue
         new_num, mul = decide_multiplier(elem)
         if multipliers[mul] < multipliers[min_mul]:
             min_mul = mul
 
     return min_mul
 
-
-if __name__ == "__main__":
-    # print(parse_num_unit_rate("123"))
-    # print(parse_num_unit_rate("100kbps", 'bps'))
-    # print(parse_num_unit_rate("1GBps", 'bps'))
-    print(decide_multiplier(1e5))
-    print(decide_multiplier(1e10))
-    print(decide_multiplier(1e-5))
-    print(decide_multiplier(1e3))
-    print(decide_multiplier(1e18))
-    print(decide_multiplier(1e-18))
-    print(decide_multiplier(1e24))
-    print(decide_multiplier(1e-20))
-    print(decide_multiplier(2))

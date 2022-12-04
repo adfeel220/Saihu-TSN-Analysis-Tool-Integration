@@ -1,32 +1,35 @@
 
-import xtfa.networks
 import networkx as nx
 
 class TSN_result():
+    '''All analysis results will be converted into this format, the output report writer only takes this format'''
+    name            : str           # Name of the network
+    tool            : str           # Tool used in this analysis. e.g. DNC or panco
+    method          : str           # Analysis method. e.g. TFA or PLP
+    graph           : nx.DiGraph    # The graph representation of the network, including unused links
+    num_servers     : int           # Number of servers in the network
+    num_flows       : int           # Number of flows in the network
+    server_delays   : dict          # Delays stored according to server names, unit in seconds. e.g. {'s_1': 1.0, 's_2': 2.0}
+    total_delay     : float         # Sum of all server delays
+    server_backlogs : dict          # Delays stored according to server names, unit in bits. e.g. {'s_1': 1.0, 's_2': 2.0}
+    max_backlog     : int           # Maximum of all server backlogs
+    flow_paths      : dict          # Path of each flow as a list of servers according to flow names. e.g. {'fl_1': ['s_1', 's_2']}
+    flow_cmu_delays : dict          # Cumulative delays by each flow. e.g. {'fl_1': {'s_1': 1.0, 's_2': 3.0}}
+    flow_delays     : dict          # End-to-end delays of each flow. e.g. {'fl_1': 4.0, 'fl_2': 7.0}
+    exec_time       : float         # Execution time of the analysis, unit in seconds
 
-    name            : str
-    tool            : str
-    method          : str
-    graph           : nx.DiGraph
-    num_servers     : int
-    num_flows       : int
-    server_delays   : dict
-    total_delay     : float
-    server_backlogs : dict
-    max_backlog     : float
-    flow_paths      : dict
-    flow_cmu_delays : dict
-    flow_delays     : dict
-    exec_time       : float
+    network_source  : str           # Source file for network definition where the result is computed
+    converted_from  : str           # Which file it's converted from, "" if it's original
+
 
     def __init__(self, **kargs) -> None:
-        self._name  = kargs.get("name", "")
+        self._name  = kargs.get("name", "NONAME")
         self._tool  = kargs.get("tool", "")
         self._graph = kargs.get("graph", nx.DiGraph())
         self._method = kargs.get("method", "")
 
-        self._num_servers = kargs.get("num_servers", 0)
-        self._num_flows = kargs.get("num_flows", 0)
+        self._num_servers = kargs.get("num_servers", "UNKNOWN")
+        self._num_flows = kargs.get("num_flows", "UNKNOWN")
 
         self._server_delays = kargs.get("server_delays", dict())
         self._total_delay = kargs.get("total_delay", None)
@@ -39,6 +42,9 @@ class TSN_result():
         self._flow_delays = kargs.get("flow_delays", None)
 
         self._exec_time = kargs.get("exec_time", None)
+
+        self._network_source = kargs.get("network_source", None)
+        self._converted_from  = kargs.get("converted_from" , "")
 
     def __repr__(self) -> str:
         return "TSN_Result(name:{name}, tool:{tool}-{method})".format(name=self._name, tool=self._tool, method=self._method)
@@ -103,6 +109,10 @@ class TSN_result():
         return self._max_backlog
 
     @property
+    def network_source(self)->dict:
+        return self._network_source
+
+    @property
     def flow_paths(self)->dict:
         return self._flow_paths
 
@@ -117,3 +127,10 @@ class TSN_result():
     @property
     def exec_time(self)->int:
         return self._exec_time
+
+    @property
+    def converted_from(self)->bool:
+        return self._converted_from
+
+    def is_converted(self)->bool:
+        return len(self._converted_from)>0

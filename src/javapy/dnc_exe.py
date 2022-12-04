@@ -14,6 +14,3 @@ def dnc_exe(ifpath:str, dnc_jar_path:str="./", tools:list=["TFA"])->str:
     args = ["-i", ifpath, "-t", ",".join(tools)]
     return check_output("java -jar " + join(dnc_jar_path, "dnc_analysis.jar") + ' ' + ' '.join(args), shell=True).decode("utf-8")
 
-
-if __name__ == "__main__":
-    print(dnc_exe("demo4.json"))

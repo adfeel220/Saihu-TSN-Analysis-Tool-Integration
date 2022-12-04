@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<elements>
+	<network name="demo" technology="FIFO"/>
+	<station name="src-fl_0"/>
+	<station name="sink-fl_0"/>
+	<station name="src-fl_1"/>
+	<station name="sink-fl_1"/>
+	<switch name="sw_0" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_1" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_2" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_3" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_4" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_5" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_6" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_7" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<switch name="sw_8" service-latency="0.01s" service-rate="10000000.0" transmission-capacity="100000000.0"/>
+	<link from="src-fl_0" to="sw_2" fromPort="0" toPort="0" name="lk:src-fl_0_0-sw_2_0"/>
+	<link from="sw_8" to="sink-fl_0" fromPort="0" toPort="0" name="lk:sw_8_0-sink-fl_0_0"/>
+	<link from="src-fl_1" to="sw_1" fromPort="0" toPort="0" name="lk:src-fl_1_0-sw_1_0"/>
+	<link from="sw_6" to="sink-fl_1" fromPort="0" toPort="0" name="lk:sw_6_0-sink-fl_1_0"/>
+	<link from="sw_1" to="sw_2" fromPort="0" toPort="0" name="lk:sw_1_0-sw_2_0"/>
+	<link from="sw_1" to="sw_3" fromPort="0" toPort="0" name="lk:sw_1_0-sw_3_0"/>
+	<link from="sw_2" to="sw_4" fromPort="0" toPort="0" name="lk:sw_2_0-sw_4_0"/>
+	<link from="sw_3" to="sw_4" fromPort="0" toPort="0" name="lk:sw_3_0-sw_4_0"/>
+	<link from="sw_4" to="sw_5" fromPort="0" toPort="0" name="lk:sw_4_0-sw_5_0"/>
+	<link from="sw_5" to="sw_6" fromPort="0" toPort="0" name="lk:sw_5_0-sw_6_0"/>
+	<link from="sw_6" to="sw_7" fromPort="0" toPort="0" name="lk:sw_6_0-sw_7_0"/>
+	<link from="sw_7" to="sw_8" fromPort="0" toPort="0" name="lk:sw_7_0-sw_8_0"/>
+	<flow name="fl_0" arrival-curve="leaky-bucket" lb-burst="10000b" lb-rate="100000.0" source="src-fl_0" maximum-packet-size="0">
+		<target>
+			<path node="sw_2"/>
+			<path node="sw_4"/>
+			<path node="sw_5"/>
+			<path node="sw_6"/>
+			<path node="sw_7"/>
+			<path node="sw_8"/>
+			<path node="sink-fl_0"/>
+		</target>
+	</flow>
+	<flow name="fl_1" arrival-curve="leaky-bucket" lb-burst="10000b" lb-rate="100000.0" source="src-fl_1" maximum-packet-size="0">
+		<target>
+			<path node="sw_1"/>
+			<path node="sw_3"/>
+			<path node="sw_4"/>
+			<path node="sw_5"/>
+			<path node="sw_6"/>
+			<path node="sink-fl_1"/>
+		</target>
+	</flow>
+</elements>

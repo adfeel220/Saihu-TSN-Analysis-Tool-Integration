@@ -1,291 +1,116 @@
 {
     "network": {
-        "name": "demo.json",
-        "technology": [
-            "FIFO"
-        ]
+        "name": "demo"
     },
-    "adjacency_matrix": [
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            1
-        ],
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        ]
+    
+    "adjacency_matrix":
+    [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0]
     ],
-    "flows": [
+
+    "flows":
+    [
         {
-            "name": "fl_0_p0",
-            "path": [
-                2,
-                4,
-                5,
-                6,
-                7,
-                8
-            ],
+            "name": "fl-0",
+            "path": [2,4,5,6,7,8],
             "arrival_curve": {
-                "bursts": [
-                    10000.0
-                ],
-                "rates": [
-                    100000.0
-                ]
+                "bursts": [0.01e6],
+                "rates": [0.1e6]
             },
-            "packet_length": 0.0,
-            "arrival-curve": "leaky-bucket",
-            "maximum-packet-size": "0"
+            "packet_length": 0
         },
         {
-            "name": "fl_1_p0",
-            "path": [
-                1,
-                3,
-                4,
-                5,
-                6
-            ],
+            "name": "fl-1",
+            "path": [1,3,4,5,6],
             "arrival_curve": {
-                "bursts": [
-                    10000.0
-                ],
-                "rates": [
-                    100000.0
-                ]
+                "bursts": [0.01e6],
+                "rates": [0.1e6]
             },
-            "packet_length": 0.0,
-            "arrival-curve": "leaky-bucket",
-            "maximum-packet-size": "0"
+            "packet_length": 0
         }
     ],
-    "servers": [
+
+    "servers":
+    [
         {
+            "name": "sw-0",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_0",
-            "physical_node": "sw_0",
-            "port": null,
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-1",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_1-0",
-            "physical_node": "sw_1",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-2",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_2-0",
-            "physical_node": "sw_2",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-3",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_3-0",
-            "physical_node": "sw_3",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-4",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_4-0",
-            "physical_node": "sw_4",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-5",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_5-0",
-            "physical_node": "sw_5",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-6",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_6-0",
-            "physical_node": "sw_6",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-7",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_7-0",
-            "physical_node": "sw_7",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         },
         {
+            "name": "sw-8",
             "service_curve": {
-                "latencies": [
-                    0.01
-                ],
-                "rates": [
-                    10000000.0
-                ]
+                "latencies": [1e-2],
+                "rates": [10e6]
             },
-            "name": "sw_8-0",
-            "physical_node": "sw_8",
-            "port": "0",
-            "type": "switch",
-            "capacity": 100000000.0
+            "capacity": 100e6
         }
     ]
 }
