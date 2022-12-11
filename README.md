@@ -2,7 +2,7 @@ TSN Analysis Tools Intergration
 =======================
 Author: Chun-Tso Tsai
 Advisors: Seyed Mohammadhossein Tabatabaee, Stéphan Plassart, Jean-Yves Le Boudec
-Date: Dec 4, 2022
+Date: 2022-12-11
 Institute: Computer Communications and Applications Laboratory 2 (LCA2), École Polytechnique Fédérale de Lausane (EPFL)
 
 Table of Contents
@@ -32,13 +32,13 @@ Table of Contents
 
 
 # Introduction
-**Time-Sensitive Network (TSN)** analysis focuses on giving deterministic delay or backlog guarantees. This project integrates 4 different TSN analysis tools, including `Linear TFA Solver`, [NetCal/DNC](https://github.com/NetCal/DNC), [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa), and [panco](https://github.com/Huawei-Paris-Research-Center/panco). The users can use a unified interface to compute network delay bounds obtained by different tools, and write the results into a formated report. 
+**Time-Sensitive Networking (TSN)** analysis focuses on giving deterministic delay or backlog guarantees. This project integrates 4 different TSN analysis tools, including `Linear TFA Solver`, [NetCal/DNC](https://github.com/NetCal/DNC), [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa), and [panco](https://github.com/Huawei-Paris-Research-Center/panco). The users can use a unified interface to compute network delay bounds obtained by different tools, and write the results into a formated report. 
 
 ## Credit
 Here are the authors that implemented the individual tools used in this project.
 - `Linear TFA Solver`: I implemented it myself following the algorithm used in [Trade-off between accuracy and tractability of Network Calculus in FIFO networks](https://doi.org/10.1016/j.peva.2021.102250).
-- `xTFA`: This tool is implemented by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en).
-- `NetCal/DNC`: This tool is implemented by the NetCal team. You can visit [their repository](https://github.com/NetCal/DNC) and here are the academic references:
+- `xTFA`: This tool is implemented in `Python` by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en).
+- `NetCal/DNC`: This tool is implemented in `JAVA` by the NetCal team. You can visit [their repository](https://github.com/NetCal/DNC) and here are the academic references:
     - Arbitrary Multiplexing:
     ```
     @inproceedings{DiscoDNCv2,
@@ -65,7 +65,7 @@ Here are the authors that implemented the individual tools used in this project.
         url       = {https://link.springer.com/chapter/10.1007/978-3-030-85172-9_8}
     }
     ```
-- `panco`: The tool is implemented by [Anne Bouillard](https://ieeexplore.ieee.org/author/38526153500) at Huawei Paris Research Center. Here is the [original repository](https://github.com/Huawei-Paris-Research-Center/panco). The following is the academic reference:
+- `panco`: The tool is implemented in `Python` by [Anne Bouillard](https://ieeexplore.ieee.org/author/38526153500) at Huawei Paris Research Center. Here is the [original repository](https://github.com/Huawei-Paris-Research-Center/panco). The following is the academic reference:
     ```
     @article{BOUILLARD2022102250,
         title    = {Trade-off between accuracy and tractability of Network Calculus in FIFO networks},
@@ -298,13 +298,33 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     ```
 
 ## Analysis Tools
+### Tool Specification
+- Available method for tools
+    | Method\Tool | DNC | xTFA | Panco | Linear TFA |
+    | :--: | :-: | :--: | :---: | :----: |
+    | **TFA** | V | V | V | V |
+    | **SFA** | V |   | V |   |
+    | **PLP** |   |   | V |   |
+    | **ELP** |   |   | V |   |
+    | **PMOO** | V |
+    | **TMA** | V |
+    Note: TMA stands for Tandem Matching Analysis
+- Constraints
+    | Spec\Tool | DNC | xTFA | Panco | Linear TFA |
+    | :--: | :-: | :--: | :---: | :----: |
+    | **Manual Tune Shaping*** |  | V | V | V |
+    | **Cyclic Dependent Network***   |  | V | V | V |
+
+    Note: 1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 2. `Panco-ELP` doesn't allow cyclic dependent network.
+
+### Public Methods
 To use our general interface, you need to first import class `TSN_Analyzer` from the file `src/interface.py`.
 ```
 from interface import TSN_Analyzer
 ```
 Here is a list of all available methods
 * [init](#init)
-* [set_shaper_usage](#set_shaper_usage)
+* [set_shaping_mode](#set_shaping_mode)
 * [convert_netfile](#convert_netfile)
 * [analyze_all](#analyze_all)
 * [analyze_xtfa](#analyze_xtfa)
@@ -317,19 +337,19 @@ Here is a list of all available methods
 ### Init
 An analyzer can be initialized by
 ```
-analyzer = TSN_Analyzer(netfile, jar_path, temp_path, use_shaper)
+analyzer = TSN_Analyzer(netfile, jar_path, temp_path, shaping)
 ```
 All arguments are optional, each of them represents
 - `netfile`: The path to the network definition file, either a physical network or an output-port network.
 - `jar_path`: The path to the DNC `.jar` file.
 - `temp_path`: The path to the tempary directory to put the execution artifacts.
-- `use_shaper`: A string to select shaper mode, can be _AUTO_, _ON_, or _OFF_. Default is _AUTO_, which means to use shaper if possible.
+- `shaping`: A string to select output shaping mode, can be _AUTO_, _ON_, or _OFF_. Default is _AUTO_, which means to consider output shaping if possible.
 
-### set_shaper_usage
+### set_shaping_mode
 ```
-analyzer.set_shaper_usage(mode)
+analyzer.set_shaping_mode(mode)
 ```
-Set the shaper usage of the analyzer by a string of either _AUTO_, _ON_, or _OFF_. _AUTO_ means using shaper if possible. _ON_ and _OFF_ are forcing analyzer to use shaper or not, and don't compute result if not possible.
+Set the output shaping usage of the analyzer by a string of either _AUTO_, _ON_, or _OFF_. _AUTO_ means considering output shaping if possible. _ON_ and _OFF_ are forcing analyzer to consider output shaping or not, and don't compute result if not possible.
 
 ### convert_netfile
 ```

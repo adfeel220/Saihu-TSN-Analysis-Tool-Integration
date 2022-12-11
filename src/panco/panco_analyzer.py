@@ -229,7 +229,7 @@ class panco_analyzer():
         self.network = Network(self.servers, self.flows)
                 
 
-    def analyze(self, method:str="PLP", lp_file:str="fifo.lp", use_tfa:bool=True, use_sfa:bool=True, use_shaper:bool=True)->None:
+    def analyze(self, method:str="PLP", lp_file:str="fifo.lp", use_tfa:bool=True, use_sfa:bool=True, output_shaping:bool=True)->None:
         '''
         Analyse the stored network
 
@@ -240,25 +240,27 @@ class panco_analyzer():
         '''
         # Build network for analysis
         if self.network is None:
-            self.build_network(use_shaper)
+            self.build_network(output_shaping)
 
         # Analyse result
         if method.upper() == "PLP":
-            return self.analyze_plp(lp_file, use_tfa, use_sfa)
+            return self.analyze_fifo(lp_file, True, use_tfa, use_sfa)
+        if method.upper() == "ELP":
+            return self.analyze_fifo(lp_file, False, use_tfa, use_sfa)
         if method.upper() == "TFA":
             return self.analyze_tfa(lp_file)
         if method.upper() == "SFA":
             return self.analyze_sfa(lp_file)
             
 
-    def analyze_plp(self, lp_file:str="fifo.lp", use_tfa:bool=True, use_sfa:bool=True)->tuple:
+    def analyze_fifo(self, lp_file:str="fifo.lp", polynomial:bool=True, use_tfa:bool=True, use_sfa:bool=True)->tuple:
         '''
         Analyse using PLP with a pre-built network
         '''
         if self.network is None:
             raise RuntimeError("An analysis called before a network is built")
 
-        plp = FifoLP(self.network, polynomial=True, tfa=use_tfa, sfa=use_sfa, filename=lp_file)
+        plp = FifoLP(self.network, polynomial=polynomial, tfa=use_tfa, sfa=use_sfa, filename=lp_file)
         delay_per_flow = plp.all_delays
 
         return delay_per_flow, None
