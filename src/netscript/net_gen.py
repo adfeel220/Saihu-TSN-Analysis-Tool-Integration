@@ -71,7 +71,7 @@ def generate_interleaved_tandem(size:int, burst:float, arr_rate:float, pkt_leng:
 
     ## Dump network definition
     network = {
-        "network": {"name": f"interleave-{size}", "technology": ["FIFO", "IS"]},
+        "network": {"name": f"interleave-{size}", "technology": ["FIFO"]},
         "adjacency_matrix": adjacency_matrix,
         "flows": flows,
         "servers": servers
@@ -143,7 +143,7 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
 
     ## Dump network definition
     network = {
-        "network": {"name": f"ring-{size}", "technology": ["FIFO", "IS"]},
+        "network": {"name": f"ring-{size}", "technology": ["FIFO"]},
         "adjacency_matrix": adjacency_matrix,
         "flows": flows,
         "servers": servers
@@ -240,7 +240,7 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
             "capacity": capacity
         }
     servers[-1] = {
-        "name": f"s_{size}",
+        "name": f"s_{size-1}",
         "service_curve": {
             "latencies": [latency],
             "rates": [2*ser_rate]
@@ -251,7 +251,7 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
 
     ## Dump network definition
     network = {
-        "network": {"name": f"mesh-{size}", "technology": ["FIFO", "IS"]},
+        "network": {"name": f"mesh-{size}", "technology": ["FIFO"]},
         "adjacency_matrix": adjacency_matrix,
         "flows": flows,
         "servers": servers

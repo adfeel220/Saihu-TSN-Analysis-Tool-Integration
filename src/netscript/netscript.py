@@ -197,9 +197,16 @@ class NetworkScriptHandler:
         for row, port_info in enumerate(port_list):
             dests = self.phy_net.links.get(port_info["physical_node"], [])
             for dt in dests:
-                dt_idx = get_portlist_index(port_list, dt["dest"], dt["output_port"])
-                if dt_idx is not None:
-                    adjacency_matrix[row, dt_idx] = 1
+                next_dest = self.phy_net.links.get(dt["dest"], [])
+                # dt_idx = get_portlist_index(port_list, dt["dest"], dt["output_port"])
+                # if dt_idx is not None:
+                #     adjacency_matrix[row, dt_idx] = 1
+                for ndt in next_dest:
+                    src_idx = get_portlist_index(port_list, port_info["physical_node"], dt["output_port"])
+                    dt_idx = get_portlist_index(port_list, dt["dest"], ndt["output_port"])
+                    if src_idx is not None and dt_idx is not None:
+                        adjacency_matrix[row, dt_idx] = 1
+
 
         adjacency_matrix = adjacency_matrix.tolist()
         
@@ -240,8 +247,13 @@ class NetworkScriptHandler:
                 port_idx = get_portlist_index(port_list, step["node"], step["port"])
                 if port_idx is not None:
                     path.append(port_idx)
+
+            flow_packet_length = attrib.get("maximum-packet-size", None)
+            if flow_packet_length is None:
+                flow_packet_length = packet_length
+            flow_packet_length = parse_num_unit_data(flow_packet_length)
             
-            flow_info = {"name": fl_name,"path": path, "arrival_curve": arrival_curve, "packet_length": packet_length, **attrib}
+            flow_info = {"name": fl_name,"path": path, "arrival_curve": arrival_curve, "packet_length": flow_packet_length, **attrib}
             flows.append(flow_info)
 
         

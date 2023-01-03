@@ -76,7 +76,7 @@ class TSN_Analyzer():
     flow_delay_mul : str                    # End-to-end Delay multiplier for all the loaded results
     backlog_mul    : str                    # Backlog multiplier for all the loaded results (not used)
     exec_time_mul  : str                    # Multiplier for execution time by each analysis 
-    output_shaping     : int                    # Enum number to choose use shaper or not
+    output_shaping : int                    # Enum number to choose use shaper or not
 
 
     def __init__(self, netfile:str=None, 
@@ -134,16 +134,132 @@ class TSN_Analyzer():
             print(f"No such shaper enforcement {enforce}, must in {list(FORCE_SHAPER)} ignore")
             self.output_shaping = FORCE_SHAPER.AUTO
 
-    def write_result(self, output_file:str, clear:bool=True) -> None:
+    def export(self, default_name:str=None, json_output:str=None, report_file:str=None, clear:bool=True)->None:
         '''
-        Write the currently stored results as a Markdown file
+        Write the json output as well as the markdown report
+        '''
+        if default_name is None:
+            default_name = "result"
+        if json_output is None:
+            json_output = add_text_in_ext(default_name, "data")
+        if report_file is None:
+            report_file = add_text_in_ext(default_name, "report")
+
+        self.write_result_json(json_output, clear=False)
+        self.write_report_md(report_file, clear=False)
+
+        # Clear the current results
+        if clear:
+            self.clear()
+
+
+    def write_result_json(self, output_file:str, clear:bool=True)->None:
+        '''
+        Write the currently stored results as a json file
 
         Inputs:
         --------------
         output_file: [str] path of the output report
         clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
         '''
-        print("Writing output report...", end="")
+        print("Writing result file...", end="")
+
+        if len(self.results) == 0:
+            print("Abort writing result: No results analyzed before")
+            return
+
+        ## Start writing
+        # Resolve the number of networks in results
+        networks = dict()
+        for res in self.results:
+            if res.name not in networks:
+                networks[res.name] = list()
+            networks[res.name].append(res)
+            
+        output_index = 0
+        # We summarize one output file for each network
+        for net_name, results in networks.items():
+
+            # Determine report filename
+            output_file = check_file_ext(output_file, "json")
+            if output_index > 0:
+                output_file = add_text_in_ext(output_file, str(output_index), sep='-')
+            output_index += 1
+
+            # Retrieve the smallest unit among all results
+            units = {"time": None, "data": None, "rate": None}
+            for res in results:
+                for ut in units.keys():
+                    if ut=="time":
+                        get_func = unit_util.get_time_unit
+                    elif ut=="data":
+                        get_func = unit_util.get_data_unit
+                    elif ut=="rate":
+                        get_func = unit_util.get_rate_unit
+                    else:
+                        raise RuntimeError(f"Unrecognized unit: {ut}")
+
+                    if units[ut] is None:
+                        units[ut] = res.units[ut]
+                    # Both units and res.units are not None
+                    elif res.units[ut] is not None:
+                        # Write the result units in the stored unit
+                        unit_val = get_func(res.units[ut], units[ut])
+                        if unit_val < 1:
+                            units[ut] = res.units[ut]
+            
+            result_json = dict()
+            result_json["name"] = net_name
+            result_json["flow_e2e_delay"] = dict()
+            result_json["server_delay"] = dict()
+            result_json["execution_time"] = dict()
+            result_json["units"] = {**units, "exectution_time": self.exec_time_mul+'s'}
+
+            for res in results:
+
+                tool_method_name = f"{res.tool}_{res.method}"
+
+                # e2e flows
+                if res.flow_delays is not None:
+                    for fl_name, delay in res.flow_delays.items():
+                        if fl_name not in result_json["flow_e2e_delay"]:
+                            result_json["flow_e2e_delay"][fl_name] = dict()
+
+                        result_json["flow_e2e_delay"][fl_name][tool_method_name] = delay * unit_util.get_time_unit(res.units["time"], units["time"])
+
+                # server delay
+                if res.server_delays is not None:
+                    for s_name, delay in res.server_delays.items():
+                        if s_name not in result_json["server_delay"]:
+                            result_json["server_delay"][s_name] = dict()
+
+                        result_json["server_delay"][s_name][tool_method_name] = delay * unit_util.get_time_unit(res.units["time"], units["time"])
+
+                # execution time
+                if res.exec_time is not None:
+                    result_json["execution_time"][tool_method_name] = res.exec_time / unit_util.multipliers[self.exec_time_mul]
+            
+            with open(output_file, 'w') as of:
+                json.dump(result_json, of, indent=4)
+
+        # Clear the current results
+        if clear:
+            self.clear()
+
+        print("Done")
+
+
+    def write_report_md(self, output_file:str, comment:str=None, clear:bool=True) -> None:
+        '''
+        Write the currently stored results as a Markdown file
+
+        Inputs:
+        --------------
+        output_file: [str] path of the output report
+        comment: [str] a comment written at the beginning of the report
+        clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
+        '''
+        print("Writing report...", end="")
 
         if len(self.results) == 0:
             print("Abort writing result: No results analyzed before")
@@ -169,11 +285,11 @@ class TSN_Analyzer():
 
             ## Output tool-method specific results
             # divide the results by method used
-            res_by_methods = dict()
-            for r in res:
-                if r.method not in res_by_methods:
-                    res_by_methods[r.method] = list()
-                res_by_methods[r.method].append(r)
+            # res_by_methods = dict()
+            # for r in res:
+            #     if r.method not in res_by_methods:
+            #         res_by_methods[r.method] = list()
+            #     res_by_methods[r.method].append(r)
 
             # Determine report filename
             output_file = check_file_ext(output_file, "md")
@@ -184,11 +300,34 @@ class TSN_Analyzer():
             # Create the output Markdown file to write
             mdFile = mdu(file_name=output_file, title=f"Analysis Report - \"{net_name}\"")
             mdFile.new_paragraph("The is a automatically generated report with project `TSN Analysis Tools Intergration`\n")
+            if comment is not None:
+                mdFile.new_line("**Comment:**")
+                mdFile.new_paragraph(comment)
  
-            ## General flow end-to-end delay
-            mdFile.new_header(level=1, title="Flow End-to-end Delays")
-            self._build_flow_summary(mdFile, res_sorted)
+            ###############
+            # Output part #
+            ###############
+            # General flow end-to-end delay
+            mdFile.new_header(level=1, title="Network Analysis Result")
+            self._build_flow_e2e_table(mdFile, res_sorted)
 
+            # Server delays / backlogs
+            self._build_server_result_table(mdFile, res_sorted, "delay")
+            ## 2022.11.26 : Since only DNC returns backlog data, remove printing backlog
+            #####################################
+            # # check if there's any backlog data
+            # backlog_mapping = self._create_mapping(res, "server_backlogs")
+            # if len(backlog_mapping) > 0:
+            #     self._build_server_result_table(mdFile, res_by_methods, "backlog")
+            #####################################
+
+            # Tool-method execution time
+            mdFile.new_header(level=2, title="Execution Time")
+            self._build_performance_table(mdFile, res_sorted)
+
+            ##############
+            # Input part #
+            ##############
             ## Write general network information
             mdFile.new_header(level=1, title="Network Information")
             mdFile.new_paragraph(f"This report contains {len(res)} analysis over network **\"{net_name}\"**.\n")
@@ -199,33 +338,26 @@ class TSN_Analyzer():
             graph_file_path = os.path.join(outpath, f"{net_name}_topo.png")
             fig.savefig(graph_file_path, dpi=300, bbox_inches='tight')
             plt.close(fig)
+
+            mdFile.new_header(level=2, title="Network Topology")
+            mdFile.new_line(mdFile.new_reference_image(text="Network graph", path=f"./{net_name}_topo.png", reference_tag='topo'))
+
+            # Flow path
+            self._build_flow_paths(mdFile, res_sorted)
+
             # utility
             self._build_utility_map(mdFile, res_sorted)
-
-            mdFile.new_header(level=2, title="Topology of network")
-            mdFile.new_line(mdFile.new_reference_image(text="Network graph", path=graph_file_path, reference_tag='topo'))
-            # performance
-            mdFile.new_header(level=2, title="Execution Time")
-            self._build_performance_table(mdFile, res_sorted)
             
             
-            # Server delays / backlogs
-            mdFile.new_header(level=1, title="Server Delays")
-            self._build_server_result_table(mdFile, res_sorted, "delay")
             
-            ## 2022.11.26 : Since only DNC returns backlog data, remove printing backlog
-            #####################################
-            # # check if there's any backlog data
-            # backlog_mapping = self._create_mapping(res, "server_backlogs")
-            # if len(backlog_mapping) > 0:
-            #     self._build_server_result_table(mdFile, res_by_methods, "backlog")
-            #####################################
                 
+            ## 2022.12.15 : Decide to remove all information that can be obtained by post-processing
+            #####################################
             ## Per flow result
-            mdFile.new_header(level=1, title="Per Flow Delays")
-            for foi in res[0].flow_paths.keys():
-                self._build_flow_result_table(mdFile, res_sorted, foi)
-                
+            # mdFile.new_header(level=1, title="Delay from source through flow paths")
+            # for foi in res[0].flow_paths.keys():
+            #     self._build_flow_result_table(mdFile, res_sorted, foi)
+            #####################################
             
             # Create table of contents
             mdFile.new_table_of_contents(table_title="Table of Contents", depth=2)
@@ -233,7 +365,7 @@ class TSN_Analyzer():
             # Finally create the output file
             mdFile.create_md_file()
 
-        # Clear the current results if 
+        # Clear the current results
         if clear:
             self.clear()
 
@@ -427,18 +559,15 @@ class TSN_Analyzer():
                 
             # Get flow info
             flow_paths = dict()
-            flow_cmu_delays = dict()
             flow_delays = dict()
             for flow_id, flow in enumerate(linear_solver.flows):
                 flow_name = flow.get("name", f"fl_{flow_id}")
                 flow_paths[flow_name] = list()
-                flow_cmu_delays[flow_name] = list()
 
                 delay = 0
                 for serv_id in flow["path"]:     # list of server indices
                     flow_paths[flow_name].append(server_names[serv_id])
                     delay += delays[serv_id]
-                    flow_cmu_delays[flow_name].append(delay)
                 flow_delays[flow_name] = delay
             
             # determine delay multiplier
@@ -459,14 +588,11 @@ class TSN_Analyzer():
                 tool = "Linear",
                 method = mthd.upper(),
                 graph = net_graph,
-                num_servers = linear_solver.num_servers,
-                num_flows   = linear_solver.num_flows,
-                total_delay = sum(delays),
                 server_delays = server_delays,
                 flow_paths  = flow_paths,
-                flow_cmu_delays = flow_cmu_delays,
                 flow_delays = flow_delays,
                 exec_time   = exec_time,
+                units       = linear_solver.units,
                 network_source      = netfile,
                 from_converted_file = self.script_handler.get_network_info(netfile, "converted", "")
             )
@@ -501,7 +627,11 @@ class TSN_Analyzer():
                 
             # analyze result and check time
             start_time = time()
-            delay_per_flow, delay_per_server = panco_anzr.analyze(method=mthd, lp_file=os.path.join(self._temp_path, f"fifo_{mthd}.lp"), use_tfa=use_tfa, use_sfa=use_sfa, output_shaping=output_shaping)
+            try:
+                delay_per_flow, delay_per_server = panco_anzr.analyze(method=mthd, lp_file=os.path.join(self._temp_path, f"fifo_{mthd}.lp"), use_tfa=use_tfa, use_sfa=use_sfa, output_shaping=output_shaping)
+            except Exception as e:
+                print("Cannot execute Panco analysis. Could be the problem with lpsolve or panco itself not installed properly")
+                return
             exec_time = time() - start_time
 
             # determine execution time multiplier
@@ -513,7 +643,6 @@ class TSN_Analyzer():
 
             server_delays = None
             total_delay = None
-            flow_cmu_delays = None
             if delay_per_server is not None:
                 server_delays = dict(zip(panco_anzr.server_names, delay_per_server))
                 total_delay = sum(delay_per_server)
@@ -525,16 +654,6 @@ class TSN_Analyzer():
                 elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
                     self.serv_delay_mul = min_mul
 
-                # resolve flow cmu
-                flow_cmu_delays = dict()
-                for fl in panco_anzr.flows_info:
-                    flow_cmu_delays[fl["name"]] = list()
-
-                    delay = 0
-                    for serv_id in fl["path"]:     # list of server indices
-                        delay += delay_per_server[serv_id]
-                        flow_cmu_delays[fl["name"]].append(delay)
-
             else:
                 # determine min multiplier
                 min_mul = unit_util.decide_min_multiplier(delay_per_flow)
@@ -543,6 +662,7 @@ class TSN_Analyzer():
                 elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
                     self.serv_delay_mul = min_mul
 
+            # Resolve flow paths in server names
             flow_paths = dict()
             for fl in panco_anzr.flows_info:
                 flow_paths[fl["name"]] = [panco_anzr.server_names[p] for p in fl["path"]]
@@ -566,14 +686,11 @@ class TSN_Analyzer():
                 tool = "Panco",
                 method = mthd.upper(),
                 graph = net_graph,
-                num_servers = panco_anzr.num_servers,
-                num_flows   = panco_anzr.num_flows,
-                total_delay = total_delay,
                 server_delays = server_delays,
                 flow_paths  = flow_paths,
-                flow_cmu_delays = flow_cmu_delays,
                 flow_delays = flow_delays,
                 exec_time   = exec_time,
+                units       = panco_anzr.units,
                 network_source      = netfile,
                 from_converted_file = self.script_handler.get_network_info(netfile, "converted", "")
             )
@@ -624,8 +741,16 @@ class TSN_Analyzer():
         if self.script_handler.is_cyclic():
             print("Abort: network is cyclic")
             return
+        
+        # use the formatted network
+        formatted_net_name = os.path.join(self._temp_path, "tempnet.json")
+        self.script_handler.op_net.dump_json(formatted_net_name)
             
-        dnc_result_json_str = dnc_exe(netfile, self._jar_path, methods)
+        try:
+            dnc_result_json_str = dnc_exe(formatted_net_name, self._jar_path, methods)
+        except Exception as e:
+            print("Skip. Cannot execute DNC due to\n{}".format(e))
+            return
 
         # parse individual flows/methods into dictionaries
         result_by_methods = self._split_dnc_result(dnc_result_json_str)
@@ -640,7 +765,7 @@ class TSN_Analyzer():
             result["tool"] = "DNC"
             result["method"] = method
             server_names = res_per_method[0]["server_names"]
-            result["num_servers"] = res_per_method[0].get("num_servers", len(server_names))
+            result["units"] = self.script_handler.op_net.units.copy()
 
             # determine delays
             result["server_delays"] = res_per_method[0]["server_delays"]
@@ -691,8 +816,6 @@ class TSN_Analyzer():
                 max_backlogs.append(float(res_per_flow["max_backlog"]))
                 result["exec_time"] += res_per_flow["exec_time"]
 
-            result["num_flows"] = res_per_method[0].get("num_flows", len(result["flow_delays"]))
-
             # determine delay multiplier
             min_mul = unit_util.decide_min_multiplier(result["flow_delays"].values())
             if self.flow_delay_mul is None:
@@ -704,11 +827,10 @@ class TSN_Analyzer():
             if all([len(delays)==0 for delays in result["flow_cmu_delays"].values()]):
                 result["flow_cmu_delays"] = None
 
-            if result["server_delays"] == None:
-                result["total_delay"] = None
+            if len(max_backlogs) > 0:
+                result["max_backlog"] = max(max_backlogs)
             else:
-                result["total_delay"] = sum(result["server_delays"].values())
-            result["max_backlog"] = max(max_backlogs)
+                result["max_backlog"] = None
 
             # Create a directed graph
             adj_mat = np.array(res_per_method[0]["adjacency_matrix"])
@@ -826,7 +948,9 @@ class TSN_Analyzer():
             try:
                 result_json = json.loads(result_per_flow)
             except Exception as e:
-                raise RuntimeError("Incorrect DNC output, you may need to check the DNC output")
+                print("Abort. Cannot obtain DNC result. Could be DNC interface problem or Java problem.")
+                return result_by_methods
+                # raise RuntimeError("Incorrect DNC output, you may need to check the DNC output")
 
             method = result_json.pop("method")
             if method not in result_by_methods:
@@ -896,7 +1020,7 @@ class TSN_Analyzer():
         return flow_paths, flow_cmu_delays
 
 
-    def _build_flow_summary(self, mdFile:mdu, tm_results:dict)->None:
+    def _build_flow_e2e_table(self, mdFile:mdu, tm_results:dict)->None:
         '''
         Build a server result table on mdFile using result_dict, dict key = "tool-method", value is result object
 
@@ -905,7 +1029,7 @@ class TSN_Analyzer():
         mdFile: the markdown file to write
         tm_results: a dictionary with key="tool-method", value=corresponding result
         '''
-        mdFile.new_header(level=2, title=f"End-to-End delay bound")
+        mdFile.new_header(level=2, title=f"Per flow end-to-end delay bound")
         mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.flow_delay_mul]}seconds")
 
         paths = dict()
@@ -928,13 +1052,26 @@ class TSN_Analyzer():
         table_res = table_res.flatten().tolist()
         mdFile.new_table(rows=len(flow_mapping)+1, columns=len(tlm_mapping)+1, text=table_res)
         
+
+    def _build_flow_paths(self, mdFile:mdu, tm_results:dict)->None:
+        '''
+        Build a list of flow paths
+
+        Inputs:
+        ---------
+        mdFile: the markdown file to write
+        tm_results: a dictionary with key="tool-method", value=corresponding result
+        '''
+        paths = dict()
+        for res in tm_results.values():
+            paths.update(res.flow_paths)
+
         # Write flow paths
         mdFile.new_header(level=2, title=f"Flow paths")
         path_to_print = list()
         for flow_name, path in paths.items():
-            italic_path = [f"_{p}_" for p in path]
-            path_to_print.append(f"**{flow_name}**: {' -> '.join(italic_path)}")
-            # mdFile.new_line(f"**{flow_name}**: {' -> '.join(italic_path)}")
+            font_path = [f"`{p}`" for p in path]
+            path_to_print.append(f"**{flow_name}**: {' -> '.join(font_path)}")
         mdFile.new_list(items=path_to_print)
 
 
@@ -949,14 +1086,14 @@ class TSN_Analyzer():
         target: delay or backlog to print different attributes
         '''
         if target.lower()=="delay":
-            title_name = "Delay"
+            title_name = "delay"
             attr_name = "server_delays"
             summary_label = "Total"
             summary_attr = "total_delay"
             multiplier = self.serv_delay_mul
             unit = "second"
         if target.lower()=="backlog":
-            title_name = "Backlog"
+            title_name = "backlog"
             attr_name = "server_backlogs"
             summary_label = "Max"
             summary_attr = "max_backlog"
@@ -966,7 +1103,7 @@ class TSN_Analyzer():
         if all([getattr(res, attr_name) is None for res in tm_results.values()]):
             return
         
-        mdFile.new_header(level=2, title=f"{title_name} bound")
+        mdFile.new_header(level=2, title=f"Per server {title_name} bound")
         mdFile.new_line(f"Unit in {unit_util.multiplier_names[multiplier]}{unit}")
 
         # Table with mapping assigned
@@ -1012,10 +1149,10 @@ class TSN_Analyzer():
             return
 
         mdFile.new_header(level=2, title=f"Flow \"{flow_of_interest}\"")
-        mdFile.new_line("The name in the table is written according to the path")
+        mdFile.new_line("The server names in the table is written according to the path of flow")
         path = next(iter(tm_results.values())).flow_paths[flow_of_interest]
 
-        mdFile.new_header(level=3, title=f"Cumulative delay according to path")
+        mdFile.new_header(level=3, title=f"Delay experienced from source to each node in flow \"{flow_of_interest}\"")
         mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.serv_delay_mul]}seconds")
         
         # Table as a numpy array with initial value ""
@@ -1059,17 +1196,17 @@ class TSN_Analyzer():
 
         mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.exec_time_mul]}seconds")
 
-        col_num = max([len(ress) for ress in result_method_dict.values()])+1
-        table_perv = np.empty((len(result_method_dict)+1, col_num), dtype='object')
-        table_perv[:] = "N/A"
-        # row labels
-        table_perv[:,0] = ["method name", *result_method_dict.keys()]
-        # column labels
         tools = set()
         for ress in result_method_dict.values():
             for r in ress:
                 tools.add(r.tool)
         tool_mapping = dict(zip(sorted(list(tools)), range(len(tools))))
+
+        table_perv = np.empty((len(result_method_dict)+1, len(tool_mapping)+1), dtype='object')
+        table_perv[:] = "N/A"
+        # row labels
+        table_perv[:,0] = ["method\\tool", *result_method_dict.keys()]
+        # column labels
         table_perv[0,1:] = list(tool_mapping.keys())
 
         # fill in the contents
@@ -1079,7 +1216,7 @@ class TSN_Analyzer():
 
         # write into MD
         table_perv = table_perv.flatten().tolist()
-        mdFile.new_table(rows=len(result_method_dict)+1, columns=col_num, text=table_perv)
+        mdFile.new_table(rows=len(result_method_dict)+1, columns=len(tool_mapping)+1, text=table_perv)
 
 
     def _build_utility_map(self, mdFile:mdu, tm_results:dict)->None:

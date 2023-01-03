@@ -17,31 +17,32 @@ class TSN_result():
     flow_cmu_delays : dict          # Cumulative delays by each flow. e.g. {'fl_1': {'s_1': 1.0, 's_2': 3.0}}
     flow_delays     : dict          # End-to-end delays of each flow. e.g. {'fl_1': 4.0, 'fl_2': 7.0}
     exec_time       : float         # Execution time of the analysis, unit in seconds
+    units           : dict          # Units used in the values, can take 'time', 'data' and 'rate'. e.g. {'time': 'us', 'data': 'MB', 'rate': 'Gbps}
 
     network_source  : str           # Source file for network definition where the result is computed
     converted_from  : str           # Which file it's converted from, "" if it's original
 
 
+
     def __init__(self, **kargs) -> None:
         self._name  = kargs.get("name", "NONAME")
-        self._tool  = kargs.get("tool", "")
+        self._tool  = kargs.get("tool", "UNKNOWN_TOOL")
         self._graph = kargs.get("graph", nx.DiGraph())
-        self._method = kargs.get("method", "")
+        self._method = kargs.get("method", "UNKNOWN_METHOD")
 
-        self._num_servers = kargs.get("num_servers", "UNKNOWN")
-        self._num_flows = kargs.get("num_flows", "UNKNOWN")
-
-        self._server_delays = kargs.get("server_delays", dict())
-        self._total_delay = kargs.get("total_delay", None)
-
-        self._server_backlogs = kargs.get("server_backlogs", dict())
-        self._max_backlog = kargs.get("max_backlog", None)
+        self._server_delays = kargs.get("server_delays", None)
+        self._server_backlogs = kargs.get("server_backlogs", None)
 
         self._flow_paths = kargs.get("flow_paths", None)
-        self._flow_cmu_delays = kargs.get("flow_cmu_delays", None)
         self._flow_delays = kargs.get("flow_delays", None)
 
         self._exec_time = kargs.get("exec_time", None)
+
+        self._units = {"time": None, "data": None, "rate": None}
+        self._units.update(kargs.get("units", dict()))
+        # self._units.setdefault("time", None)
+        # self._units.setdefault("data", None)
+        # self._units.setdefault("rate", None)
 
         self._network_source = kargs.get("network_source", None)
         self._converted_from  = kargs.get("converted_from" , "")
@@ -86,11 +87,11 @@ class TSN_result():
 
     @property
     def num_servers(self)->int:
-        return self._num_servers
+        return self._graph.number_of_nodes()
 
     @property
     def num_flows(self)->int:
-        return self._num_flows
+        return len(self._flow_delays)
     
     @property
     def server_delays(self)->dict:
@@ -98,7 +99,9 @@ class TSN_result():
 
     @property
     def total_delay(self)->float:
-        return self._total_delay
+        if self._server_delays is None:
+            return None
+        return sum(self.server_delays.values())
 
     @property
     def server_backlogs(self)->dict:
@@ -106,7 +109,9 @@ class TSN_result():
 
     @property
     def max_backlog(self)->float:
-        return self._max_backlog
+        if self._server_backlogs is None:
+            return None
+        return max(self._server_backlogs.values())
 
     @property
     def network_source(self)->dict:
@@ -127,6 +132,10 @@ class TSN_result():
     @property
     def exec_time(self)->int:
         return self._exec_time
+
+    @property
+    def units(self)->dict:
+        return self._units
 
     @property
     def converted_from(self)->bool:

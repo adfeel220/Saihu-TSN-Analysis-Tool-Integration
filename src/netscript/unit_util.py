@@ -54,36 +54,55 @@ def is_number(num_str:str) -> bool:
         return False
     try:
         num = float(num_str)
-    except ValueError as e:
+    except Exception:
         return False
     else:
         return True
 
-def get_rate_unit(unit:str) -> float:
+def interpret_rate(unit:str) -> float:
     '''
     Check if it's a valid rate unit derived from time and data units.
     It must be 3 characters long as "{data unit}p{time unit}". For example "bps" stands for "bits-per-second"
     '''
     if len(unit) != 3:
-        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())};\
-                          2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
+        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())}; "
+                          +f"2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
 
     if unit[0] not in data_units:
-        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())};\
-                          2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
+        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())}; "
+                          +f"2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
+    # data unit
     du = data_units[unit[0]]
 
     if unit[1] != 'p':
-        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())};\
-                          2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
-
+        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())}; "
+                        +f"2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
 
     if unit[2] not in time_units:
-        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())};\
-                          2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
+        raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())}; "
+                        +f"2nd must be \"p\", stands for \"per\"; 3rd time unit must be either {list(time_units.keys())}")
+    # rate unit
     tu = time_units[unit[2]]
 
     return du/tu
+
+
+def get_time_unit(unitstr:str, target_unit:str='s') -> float:
+    '''
+    Convert the time unit to the target unit
+    '''
+    if unitstr is None or target_unit is None:
+        return 1
+
+    tu = time_units[unitstr[-1]]
+    mtp = multipliers[unitstr[-2]] if len(unitstr)>1 else 1
+    orig_unit = tu*mtp
+
+    tu = time_units[target_unit[-1]]
+    mtp = multipliers[target_unit[-2]] if len(target_unit)>1 else 1
+    trg = tu*mtp
+    
+    return orig_unit/trg
 
 
 def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
@@ -109,6 +128,9 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
     
     if is_number(numstr):
         return float(numstr)
+    
+    if target_unit is None:
+        raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
 
     # parse multiplier and unit into seconds
     # tu: time unit, mpt: multiplier
@@ -130,7 +152,7 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
     # parse number
     orig_num = numstr[:-1] if mtp==1 else numstr[:-2]
     if not is_number(orig_num):
-        raise ValueError(f"{numstr} is not a number")
+        raise ValueError(f"{numstr} is not a proper number with time unit")
 
     orig_num = float(orig_num) * mtp * tu
 
@@ -155,6 +177,24 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
     return orig_num / trg
 
 
+def get_data_unit(unitstr:str, target_unit:str='b') -> float:
+    '''
+    Convert the data unit to the target unit
+    '''
+    if unitstr is None or target_unit is None:
+        return 1
+
+    du = data_units[unitstr[-1]]
+    mtp = multipliers[unitstr[-2]] if len(unitstr)>1 else 1
+    orig_unit = du*mtp
+
+    du = data_units[target_unit[-1]]
+    mtp = multipliers[target_unit[-2]] if len(target_unit)>1 else 1
+    trg = du*mtp
+    
+    return orig_unit/trg
+
+
 def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     '''
     Parse the number string with unit to a number in target unit. Default converting into 'bits'
@@ -177,7 +217,10 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     '''
     
     if is_number(numstr):
-        return int(numstr)
+        return float(numstr)
+    
+    if target_unit is None:
+        raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
 
     # parse multiplier and unit into seconds
     # du: data unit, mpt: multiplier
@@ -201,9 +244,9 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     # parse number
     orig_num = numstr[:-1] if mtp==1 else numstr[:-2]
     if not is_number(orig_num):
-        raise ValueError(f"{numstr} is not a number")
+        raise ValueError(f"{numstr} is not a proper number with data unit")
 
-    orig_num = int(orig_num) * mtp * du
+    orig_num = float(orig_num) * mtp * du
 
     
     # Parse target unit and multiplier
@@ -223,9 +266,28 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     if mtp < 1:
         raise ValueError(f"Data multiplier must >= 1, get \"{mtp}\" instead")
 
-    trg = int(du*mtp)
+    trg = float(du*mtp)
 
     return orig_num / trg
+
+
+def get_rate_unit(unitstr:str, target_unit:str='bps') -> float:
+    '''
+    Convert the rate unit to the target unit
+    '''
+    if unitstr is None or target_unit is None:
+        return 1
+
+    ru = interpret_rate(unitstr[-3:])
+    mtp = multipliers[unitstr[0]] if len(unitstr)>3 else 1
+    orig_unit = ru*mtp
+
+    ru = interpret_rate(target_unit[-3:])
+    mtp = multipliers[target_unit[0]] if len(target_unit)>3 else 1
+    trg = ru*mtp
+    
+    return orig_unit/trg
+
 
 
 def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
@@ -252,12 +314,15 @@ def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
     if is_number(numstr):
         return float(numstr)
 
+    if target_unit is None:
+        raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
+
     # parse multiplier and unit into seconds
     # ru: rate unit, tu: time unit, du: data unit, mpt: multiplier
     
     ru = numstr[-3:]
     # parse rate unit
-    ru = get_rate_unit(ru)
+    ru = interpret_rate(ru)
 
     # parse multiplier
     mtp = 1
@@ -271,14 +336,14 @@ def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
     # parse number
     orig_num = numstr[:-3] if mtp==1 else numstr[:-4]
     if not is_number(orig_num):
-        raise ValueError(f"{numstr} is not a number")
+        raise ValueError(f"{numstr} is not a proper number with rate unit")
 
     orig_num = float(orig_num) * mtp * ru
 
     
     # Parse target unit and multiplier
     # parse rate unit
-    ru = get_rate_unit(target_unit[-3:])
+    ru = interpret_rate(target_unit[-3:])
 
     # parse multiplier
     mtp = 1

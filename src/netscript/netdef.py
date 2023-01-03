@@ -3,8 +3,12 @@ import xml.etree.ElementTree
 import warnings
 import copy
 import numpy as np
-import networkx as nx
 import json
+from typing import Union
+from copy import deepcopy
+
+import networkx as nx
+from netscript.unit_util import *
 
 keysInWopanetXML = {
     "network": "network",
@@ -32,6 +36,24 @@ def warning_override(message, category = UserWarning, filename = '', lineno = -1
     '''
     print("Warning:", message, category)
 warnings.showwarning = warning_override
+
+
+def try_raise(task_str:str, data, func, *fargs, **fkargs):
+    '''
+    Try to execution func with arguments "fargs" and "fkargs" when the function possibly raise an error
+    and add another layer to show proper information
+
+    task_str : [str] to describe the task we are trying
+    data : [Any printable] the data we are to process now
+
+    func   : the function to execute
+    fargs  : sequential arguments for func
+    fkargs : keyword arguments for func
+    '''
+    try:
+        return func(*fargs, **fkargs)
+    except Exception as e:
+        raise Exception("Error when trying on {task} with data {d}".format(task=task_str, d=data)) from e
 
 
 class PhysicalNet:
@@ -224,23 +246,76 @@ class PhysicalNet:
 
 
 class OutputPortNet:
+    '''
+    A wrapper to describe an output-port network. 
+
+    Attributes:
+    -----------
+    network_info  : [dict] contains general network information
+    adjacency_mat : [np.ndarray] the adjacency matrix w.r.t. the "id"s defined in servers
+    servers       : [list] list of dictionaries of servers
+    flows         : [list] list of dictionaries of flows
+    units         : [dict] of attributes "time", "data" and "rate" to indicate the units used in this network
+    '''
 
     network_info : dict
-    topology: np.ndarray
+    adjacency_mat: np.ndarray
     servers : list
     flows   : list
+
+    units: dict
+
+    # The mandatory entries at each level and its type
+    _mandatory_entries : dict = {
+        "network": {
+            "name": str
+        },
+        "flows": {
+            "name": str,
+            "path": list,
+            "arrival_curve": {
+                "bursts": list,
+                "rates": list
+            }
+        },
+        "servers": {
+            "name": str,
+            "service_curve": {
+                "latencies": list,
+                "rates": list
+            }
+        }
+    }
 
     def __init__(self, ifile:str=None, network_def:dict=None):
         self.network_info  = dict() # general network information
         self.adjacency_mat = None   # adjacency matrix
         self.servers = list()
         self.flows = list()
+        self.units = {
+            'time': None,
+            'data': None,
+            'rate': None
+        }
 
         if network_def is not None:
             self.parse(network_def)
             return
         if ifile is not None:
             self.read(ifile)
+
+    def __str__(self) -> str:
+        outstr = "Outport-port Network {netname}\n====================\n".format(netname=self.network_info["name"])
+        outstr += "Network Information:\n"
+        outstr += str(self.network_info)+"\n"
+        outstr += "Adjacency Matrix:\n"
+        outstr += str(self.adjacency_mat)+"\n"
+        outstr += "Servers:\n"
+        outstr += '\n'.join([str(s) for s in self.servers]) + "\n"
+        outstr += "Flows:\n"
+        outstr += '\n'.join([str(f) for f in self.flows]) + "\n"
+        outstr += "-------------------\n"
+        return outstr
 
     def read(self, ifpath:str)->None:
         '''
@@ -256,12 +331,10 @@ class OutputPortNet:
         '''
         Read from a dictionary loaded from json
 
-        0. network information:
-         - a dict stores general network information
-        
-        1. adjacency matrix:
-         - a 2D array representing a directed graph
-        
+        1. network information:
+          - a dict stores general network information
+          - Or default values of parameters
+
         2. flows:
          - a list of objects representing each flow.
            a flow is defined by
@@ -279,109 +352,336 @@ class OutputPortNet:
              - latencies: a list indicates latencies of curves
              - rates: a increasing list of service rates
         '''
+        self._assert_mandatory_fields(network_def)
         ## Load network information
-        if "network" not in network_def:
-            default_net_info = {
-                "name": "NONAME",
-                "technology": ["FIFO"]
-            }
-            network_def["network"] = default_net_info
+        # A network information must at least have "name"
         self.network_info = network_def["network"]
+        self.units = {
+            "time": network_def["network"].get("time_unit", self.units["time"]),
+            "data": network_def["network"].get("data_unit", self.units["data"]),
+            "rate": network_def["network"].get("rate_unit", self.units["rate"])
+        }
 
-        ## Load adjacency matrix
-        self.adjacency_mat = np.array(network_def['adjacency_matrix'], dtype=np.int8)
-        num_servers = self.adjacency_mat.shape[0]
-        # Assert the input is a valid adjacency matrix
-        if len(self.adjacency_mat.shape) != 2:
-            raise SyntaxError(f"Adjacency matrix dimension incorrect. Expect 2 but get {len(self.adjacency_mat.shape)}")
-        if self.adjacency_mat.shape[0] != self.adjacency_mat.shape[1]:
-            raise SyntaxError(f"Adjacency matrix should be square, get dimension {self.adjacency_mat.shape} instead")
+        # Get server name mapping
+        server_name_index_table = dict(zip([s["name"] for s in network_def["servers"]], range(len(network_def["servers"]))))
+        # Initialize adjacency matrix
+        self.adjacency_mat = np.zeros((len(server_name_index_table), len(server_name_index_table)), dtype=np.int8)
 
         ## Load flows
         self.flows = []
-        for id, fl in enumerate(network_def['flows']):
-            path = fl["path"]
+        for fid, fl in enumerate(network_def['flows']):
+            flow_name = fl["name"]
+
+            fl["id"] = fid
+
+            # path defined as a list of server names
+            path_in_name = fl["path"]
+
+            # path defined as a list of server indices, server index is the order defined in server list
+            path_in_idx = [None]*len(path_in_name)
+            for sid, sname in enumerate(path_in_name):
+                if sname not in server_name_index_table:
+                    raise RuntimeError(f"Server name \"{sname}\" written in flow \"{flow_name}\" is not defined")
+                path_in_idx[sid] = server_name_index_table[sname]
+
+            fl["path"] = path_in_idx
 
             ## Check if it's a valid path
             # 1. no recurring server along the path
-            if len(path) != len(set(path)):
-                warnings.warn(f"Skip flow {id} due to recurring server in its path: {path}")
+            if len(path_in_idx) != len(set(path_in_idx)):
+                raise RuntimeError(f"Skip flow {flow_name} due to recurring server in its path: {path_in_name}")
+            # 2. non-empty path
+            if len(path_in_idx) <= 0:
+                warnings.warn(f"Skip flow {flow_name} because its path is empty, you may delete this flow")
                 continue
-            # 2. path definition matches the number of servers. i.e. 0 < path_length <= # of servers
-            if len(path) <= 0:
-                warnings.warn(f"Skip flow {id} because its path is empty")
-                continue
-            for s in path:
-                if s >= num_servers or s < 0:
-                    raise SyntaxError(f"Path definition in flow {id} is incorrect. Server ID should be 0-{num_servers-1}, get {s} instead.")
-            # 3. Each adjacent servers along the path is connected by a link
-            for si in range(len(path)-1):
-                if self.adjacency_mat[path[si], path[si+1]] == 0:
-                    raise ValueError(f"Path of flow {id} invalid. No link between server {path[si]} and {path[si+1]}")
+
+            # Construct adjacency matrix
+            for sid in range(len(path_in_idx)-1):
+                self.adjacency_mat[path_in_idx[sid], path_in_idx[sid+1]] = 1
 
             ## Check arrival curve syntax
             arrival_curve = fl["arrival_curve"]
-            # assertion of arrival curve definition
-            self.assert_curve(arrival_curve, id)
+            # Get local unit
+            unit = {
+                "time": fl.pop("time_unit", self.units["time"]),
+                "data": fl.pop("data_unit", self.units["data"]),
+                "rate": fl.pop("rate_unit", self.units["rate"])
+            }
+            # Convert arrival curve to the default unit
+            arrival_curve["bursts"] = try_raise(f"Parsing flows.arrival_curve.bursts of \"{flow_name}\"", arrival_curve["bursts"] , self._convert_unit, arrival_curve["bursts"], unit["data"], "data")
+            arrival_curve["rates"]  = try_raise(f"Parsing flows.arrival_curve.rates of \"{flow_name}\"" , arrival_curve["rates"]  , self._convert_unit, arrival_curve["rates"], unit["rate"], "rate")
+
+            # Assert the curve properties
+            self._assert_curve(arrival_curve, flow_name)
+
+            fl["arrival_curve"] = arrival_curve
 
             ## Check packet length
-            if fl["packet_length"] < 0:
-                pkt_len = fl["packet_length"]
-                raise ValueError(f"Packet length of flow {id} is negative ({pkt_len}), should at least >= 0.")
+            # maximum packet length:
+            # it tries to find a local definition, if locally not defined, use the network default,
+            # if network default is still not defined, use the maximum burst among all bursts
+            default_max_pkt_len = network_def["network"].get("max_packet_length", max(arrival_curve["bursts"]))
+            max_pkt_len = fl.get("max_packet_length", default_max_pkt_len)
+            max_pkt_len = try_raise(f"Parsing flows.max_packet_length of \"{flow_name}\"", max_pkt_len, self._convert_unit, max_pkt_len, unit["data"], "data")
+            if max_pkt_len < 0:
+                raise ValueError(f"Maximum packet length of flow {flow_name} is negative ({max_pkt_len}), should at least >= 0.")
+            fl["max_packet_length"] = max_pkt_len
 
-            self.flows.append(fl.copy())
+            # minimum packet length:
+            # it tries to find a local definition, if locally not defined, use the network default,
+            # if network default is still not defined, use the minimum burst among all bursts
+            default_min_pkt_len = network_def["network"].get("min_packet_length", min(arrival_curve["bursts"]))
+            min_pkt_len = fl.get("min_packet_length", default_min_pkt_len)
+            min_pkt_len = try_raise(f"Parsing flows.min_packet_length of \"{flow_name}\"", max_pkt_len, self._convert_unit, min_pkt_len, unit["data"], "data")
+            if min_pkt_len < 0:
+                raise ValueError(f"Minimum packet length of flow {flow_name} is negative ({min_pkt_len}), should at least >= 0.")
+            fl["min_packet_length"] = min_pkt_len
+
+            self.flows.append(fl)
 
         ## Load servers
         self.servers = []
-        for ser_id, ser in enumerate(network_def["servers"]):
-            ## Check service curve
-            # assertion of arrival curve definition
-            self.assert_curve(ser["service_curve"], ser_id)
+        for ser in network_def["servers"]:
 
-            ## Check server capacity
-            if ser["capacity"] <= 0:
-                raise ValueError(f"Capacity of server {ser_id} is non-positive, should at least >0.")
+            ser_name = ser["name"]
 
-            self.servers.append(ser.copy())
+            ser["id"] = server_name_index_table[ser_name]
+
+            #################
+            # Service curve #
+            #################
+            # Get local unit
+            unit = {
+                "time": ser.pop("time_unit", self.units["time"]),
+                "data": ser.pop("data_unit", self.units["data"]),
+                "rate": ser.pop("rate_unit", self.units["rate"])
+            }
             
-        if len(self.servers) != num_servers:
-            raise ValueError(f"Network adjacency matrix doesn't match with server definitions. Network is defined with {num_servers} nodes but {len(self.servers)} servers defined.")
+            # assertion of arrival curve definition
+            service_curve = ser["service_curve"]
 
+            # Convert service curve to the default unit
+            service_curve["latencies"] = try_raise(f"Parsing servers.service_curve.latencies of \"{ser_name}\"", service_curve["latencies"], self._convert_unit, service_curve["latencies"], unit["time"], "time")
+            service_curve["rates"] = try_raise(f"Parsing servers.service_curve.rates of \"{ser_name}\"", service_curve["rates"], self._convert_unit, service_curve["rates"], unit["rate"], "rate")
+            
+            # Assert the curve properties
+            self._assert_curve(service_curve, ser_name)
 
+            ser["service_curve"] = service_curve
 
-    def assert_curve(self, curve:dict, curve_id:int) -> None:
+            ############
+            # Capacity #
+            ############
+            # Default capacity is the maximum service rate
+            default_capacity = network_def["network"].get("capacity", max(service_curve["rates"]))
+            capacity = ser.get("capacity", default_capacity)
+            capacity = try_raise(f"Parsing servers.capacity of \"{ser_name}\"", capacity, self._convert_unit, capacity, unit["rate"], "rate")
+
+            # check server capacity validity
+            if ser["capacity"] <= 0:
+                raise ValueError(f"Capacity of server {ser_name} is non-positive, should at least >0.")
+
+            ser["capacity"] = capacity
+
+            self.servers.append(ser)
+            
+    
+    def dump_json(self, ofile:str) -> None:
         '''
-        assert the properties of acurve
+        Dump the file into a json
+        '''
+        out_dict = {
+            "network": self.network_info,
+            "adjacency_matrix": self.adjacency_mat.tolist(),
+            "flows": self.flows,
+            "servers": self.servers
+        }
+        with open(ofile, 'w') as f:
+            json.dump(out_dict, f, indent=4)
+
+
+    def _assert_mandatory_fields(self, data:dict, subfields:list=[]) -> None:
+        '''
+        Assert the fields of a loaded json data
+
+        Inputs:
+        ----------
+        data: the data to be check
+        subfields: a list of keywords to check, to check field defined in mandatory_entries["network"], the subfields is ["network"]
+        '''
+        # Access the field for check
+        check_field = deepcopy(self._mandatory_entries)
+        for f in subfields:
+            check_field = check_field[f]
+
+        # still have deeper fields to check
+        if type(check_field) is dict:
+            # Check all fields stored of the current layer
+            for field, ftype in check_field.items():
+                if field not in data:
+                    raise AttributeError("No \"{missing}\" object is defined in \"{subfd}\" of data {dt}\n A \"{subfd}\" object in network description file must have attributes {must_have}"\
+                                        .format(missing=field, subfd='.'.join(subfields), dt=data, must_have=list(check_field.keys())))
+                # Explore deeper laters
+                if type(ftype) is not type:
+                    # if it's a list, we make sure all entries inside the list is good
+                    if type(data[field]) is list:
+                        for sf in data[field]:
+                            try:
+                                self._assert_mandatory_fields(sf, [*subfields, field])
+                            except Exception as e:
+                                raise AttributeError("Missing mandatory field in \"{fields}\" of data {dt} ".format(fields="->".join([*subfields, field]), dt=sf)) from e
+                    else:
+                        try:
+                            self._assert_mandatory_fields(data[field], [*subfields, field])
+                        except Exception as e:
+                            raise AttributeError("Missing mandatory field in \"{fields}\" of data {dt} ".format(fields="->".join([*subfields, field]), dt=data[field])) from e
+                            
+                
+    def _convert_unit(self, data:Union[float,Iterable], written_unit:str, unit_type:str):
+        '''
+        Convert the data written in another unit into default unit
+
+        Inputs:
+        ----------
+        data : [float | Iterable] the data, or the iterable of data to be converted
+        writte_unit : [str] the unit that the data is written in
+        
+        '''
+        if unit_type.lower() == "time":
+            parse_func = parse_num_unit_time
+        elif unit_type.lower() == "data":
+            parse_func = parse_num_unit_data
+        elif unit_type.lower() == "rate":
+            parse_func = parse_num_unit_rate
+        else:
+            raise SyntaxError(f"Unit type \"{unit_type}\" is not a valid input. Should be either \"time\"/\"data\"/\"rate\"")
+
+        # pure number : use the locally defined unit
+        if is_number(data):
+            data_with_unit = "{num}{unit}".format(num=data, unit=written_unit)
+            try:
+                return parse_func(data_with_unit, self.units[unit_type.lower()])
+            except ValueError as e:
+                raise ValueError(f"Error trying to convert with unit \"{written_unit}\"") from e
+
+        # already with unit : use the unit written in the string
+        elif type(data) is str:
+            try:
+                return parse_func(data, self.units[unit_type.lower()])
+            except ValueError as e:
+                raise ValueError(f"Error trying to convert \"{data}\"") from e
+
+
+        # should be an iterable
+        else:
+            output = []
+            for d in data:
+                # pure number : use the locally defined unit
+                if is_number(d):
+                    data_with_unit = "{num}{unit}".format(num=d, unit=written_unit)
+                    try:
+                        output.append(parse_func(data_with_unit, self.units[unit_type.lower()]))
+                    except ValueError as e:
+                        raise ValueError(f"Error trying to convert with unit \"{written_unit}\"") from e
+
+
+                # already with unit : use the unit written in the string
+                elif type(d) is str:
+                    try:
+                        output.append(parse_func(d, self.units[unit_type.lower()]))
+                    except ValueError as e:
+                        raise ValueError(f"Error trying to convert \"{d}\"") from e
+
+            return output
+
+
+
+    def _assert_curve(self, curve:dict, name:int) -> None:
+        '''
+        assert the properties of a curve
         '''
         if "latencies" in curve:
             # the curve is a service curve, extract latencies
             curve_type = "service"
-            lat_bur_len  = len(curve["latencies"])
+            attr_name = "latencies"
+            attr_type = "server"
+            lat_bur_len = len(curve["latencies"])
         elif "bursts" in curve:
             # the curve is an arrival curve, extract bursts
             curve_type = "arrival"
-            lat_bur_len  = len(curve["bursts"])
+            attr_name = "bursts"
+            attr_type = "flow"
+            lat_bur_len = len(curve["bursts"])
         else:
-            raise RuntimeError(f"Not a valid curve definition, neither \"latencies\" nor \"bursts\" are in the curve definition")
+            raise KeyError(f"Not a valid curve definition, neither \"latencies\" nor \"bursts\" are in the curve definition")
 
         rate_len = len(curve["rates"])
 
         # Ensure there's at least 1 line defined
         if lat_bur_len < 1:
-            raise SyntaxError(f"No latency defined in the service curve of server {curve_id}")
+            raise SyntaxError(f"No {attr_name} defined in the {curve_type} curve of {attr_type} \"{name}\"")
         if rate_len < 1:
-            raise SyntaxError(f"No service rate defined in the service curve of server {curve_id}")
+            raise SyntaxError(f"No {curve_type} rate defined in the {curve_type} curve of {attr_type} \"{name}\"")
 
         # Check number of segments of the service curve coherent in latencies/rates
         min_len = min(lat_bur_len, rate_len)
         if lat_bur_len != rate_len:
-            warnings.warn(f"Length of latencies/bursts and rates are different in curve {curve_id}. {lat_bur_len} numbers in latencies/bursts' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
-            if curve_type == "service":
-                curve["latencies"] = curve["latencies"][:min_len]
-            elif curve_type == "arrival":
-                curve["bursts"] = curve["bursts"][:min_len]
+            warnings.warn(f"Length of {attr_name} and rates are different in curve of \"{name}\". {lat_bur_len} numbers in {attr_name}' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead")
+            curve[attr_name] = curve[attr_name][:min_len]
             curve["rates"] = curve["rates"][:min_len]
 
+        # Ensure the curve is written in-order and remove redundent curves
+        # 'in-order' means for arrival curve, all token-buckets are written as 
+        # increasing bursts and decreasing rates; for service curves, all rate-latency
+        # curves are written as increasing latencies and increasing rates.
+
+        # rearrange based on bursts in increasing order
+        order = np.argsort(curve[attr_name])
+        bur_lat = np.array(curve[attr_name])[order]
+        rates = np.array(curve["rates"])[order]
+
+        # Check the curve is concave
+        valid_curve_points = np.ones_like(bur_lat, dtype=bool)
+        prev_bur_lat = 0
+        prev_rate  = np.inf if attr_type=="flow" else 0
+        for i in range(len(bur_lat)):
+            curr_bur_lat = bur_lat[i]
+            curr_rate  = rates[i]
+
+            # we sort the curves by burst/latency in increasing order,
+            # so we won't have smaller burst/latency value than the previous one.
+            # Thus we consider 2 cases: equal and greater
+
+            # burst/latency is equal, 
+            # choose the smaller rate for token-bucket
+            # choose the larger rate for rate-latency
+            if curr_bur_lat == prev_bur_lat:
+                if attr_type == "flow":
+                    if curr_rate < prev_rate:
+                        valid_curve_points[i-1] = False
+                    else:
+                        valid_curve_points[i] = False
+                        continue    # don't need to update previous value
+                else: # attr_type == "server"
+                    if curr_rate > prev_rate:
+                        valid_curve_points[i-1] = False
+                    else:
+                        valid_curve_points[i] = False
+                        continue    # don't need to update previous value
+
+            # arrival curve: if burst is larger but rate is also larger -> ignore
+            # service curve: if latency is larger but rate is also smaller -> ignore
+            elif curr_rate>=prev_rate and attr_type=="flow" or curr_rate<=prev_rate and attr_type=="server":
+                valid_curve_points[i] = False
+                continue    # don't need to update previous value
+
+            
+            prev_bur_lat = curr_bur_lat
+            prev_rate  = curr_rate
+
+        # Update arrival curve
+        curve[attr_name] = bur_lat[valid_curve_points].tolist()
+        curve["rates"]   = rates[valid_curve_points].tolist()
 
     
     def get_gif(self)->nx.DiGraph:
@@ -428,3 +728,8 @@ class OutputPortNet:
         utility = dict(zip(ser_names, agg_arr_rate/ser_rates))
         
         return utility
+
+if __name__ == "__main__":
+    opnet = OutputPortNet(ifile="./demo_net.json")
+    print(opnet)
+    

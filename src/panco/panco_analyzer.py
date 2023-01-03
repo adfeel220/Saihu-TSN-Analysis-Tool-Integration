@@ -5,7 +5,10 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 import json
 import warnings
+from copy import deepcopy
 import numpy as np
+
+from netscript.netdef import OutputPortNet
 
 # Import panco PLP modules
 from panco.descriptor.curves import TokenBucket, RateLatency
@@ -33,8 +36,6 @@ class panco_analyzer():
 
     network_info  : dict
     adjacency_mat : np.ndarray
-    num_servers   : int
-    num_flows     : int
     flows_info    : list
     servers_info  : list
     server_no_flow : list
@@ -52,11 +53,11 @@ class panco_analyzer():
         # Directly loaded information, may not all used in analysis
         self.network_info = None
         self.adjacency_mat = None
-        self.num_flows = 0
-        self.num_servers = 0
         self.flows_info = list()
         self.servers_info = list()
-        self.server_no_flow = list()
+
+        self.server_no_flow = set()
+        self.shaper_defined = True
 
         # Translated info for PLP tool
         self.network = None
@@ -64,6 +65,8 @@ class panco_analyzer():
         self.flow_names = list()
         self.servers = list()
         self.server_names = list()
+
+        self.units = {'time': None, 'data': None, 'rate': None}
 
         if filename is not None:
             self.load(filename)
@@ -82,85 +85,37 @@ class panco_analyzer():
             raise e
 
     
-    def parse(self, network_def:dict)->None:
+    def parse(self, network_def:dict) -> None:
         '''
-        Parse a network definition file
+        Parse the network into the information needed for this tool
         '''
-        ## Load general network information
-        self.network_info = network_def["network"]
+        # Read by output port network
+        output_port_net = OutputPortNet(network_def=network_def)
 
-        ## Load adjacency matrix
-        self.adjacency_mat = np.array(network_def['adjacency_matrix'], dtype=np.int8)
-        self.num_servers   = self.adjacency_mat.shape[0]
-        # Assert the input is a valid adjacency matrix
-        if len(self.adjacency_mat.shape) != 2:
-            raise SyntaxError(f"Adjacency matrix dimension incorrect. Expect 2 but get {len(self.adjacency_mat.shape)}")
-        if self.adjacency_mat.shape[0] != self.adjacency_mat.shape[1]:
-            raise SyntaxError(f"Adjacency matrix should be square, get dimension {self.adjacency_mat.shape} instead")
+        # Load general network information
+        self.network_info  = deepcopy(output_port_net.network_info)
+        self.units = deepcopy(output_port_net.units)
+        self.adjacency_mat = output_port_net.adjacency_mat.copy()
+        self.flows_info = deepcopy(output_port_net.flows)
+        self.servers_info = deepcopy(output_port_net.servers)
 
-        ## Load flows
-        self.flows_info = []
-        for id, fl in enumerate(network_def['flows']):
-            path = fl["path"]
-
-            ## Check if it's a valid path
-            # 1. no recurring server along the path
-            if len(path) != len(set(path)):
-                warnings.warn(f"Skip flow {id} due to recurring server in its path: {path}")
-                continue
-            # 2. path definition matches the number of servers. i.e. 0 < path_length <= # of servers
-            if len(path) <= 0:
-                warnings.warn(f"Skip flow {id} because its path is empty")
-                continue
-            for s in path:
-                if s >= self.num_servers or s < 0:
-                    raise SyntaxError(f"Path definition in flow {id} is incorrect. Server ID should be 0-{self.num_servers-1}, get {s} instead.")
-            # 3. Each adjacent servers along the path is connected by a link
-            for si in range(len(path)-1):
-                if self.adjacency_mat[path[si], path[si+1]] == 0:
-                    raise ValueError(f"Path of flow {id} invalid. No link between server {path[si]} and {path[si+1]}")
-
-            ## Check arrival curve syntax
-            arrival_curve = fl["arrival_curve"]
-            # assertion of arrival curve definition
-            self.assert_arrival_curve(arrival_curve=arrival_curve, flow_id=id)
-
-            ## Check packet length
-            if fl["packet_length"] < 0:
-                pkt_len = fl["packet_length"]
-                raise ValueError(f"Packet length of flow {id} is negative ({pkt_len}), should at least >= 0.")
-
-            self.flows_info.append(fl.copy())
-
-        self.num_flows = len(self.flows_info)
-
-        ## Load servers
-        self.servers_info = []
-        for ser_id, ser in enumerate(network_def["servers"]):
-
-            ## Assign packet length according to flow paths
-            pkt_len = [fl["packet_length"] for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
-            # Assign the maximum possible packet length that passes through the server
-            if len(pkt_len) > 0:
-                ser['packet_length'] = max(pkt_len)
-            # it's possible that exists isolated server
-            else:
-                warnings.warn(f"No flow passes through server {ser_id}, you may remove it from the analysis", UserWarning)
-                self.server_no_flow.append(ser_id)
-                ser['packet_length'] = 0
-
-            ## Check service curve
-            # assertion of arrival curve definition
-            self.assert_service_curve(ser["service_curve"], ser_id)
-
+        # Assign 
+        for ser in self.servers_info:
             ## Check server capacity
-            if ser["capacity"] <= 0:
-                raise ValueError(f"Capacity of server {ser_id} is non-positive, should at least >0.")
+            # Turn off shaper if any of the server doesn't have shaper
+            if "capacity" not in ser:
+                self.shaper_defined = False
+            elif ser["capacity"] <= 0:
+                warnings.warn("Capacity of server \"{0}\" is non-positive, should at least >0. Ignore using shaper.".format(ser["name"]))        
 
-            self.servers_info.append(ser.copy())
-            
-        if len(self.servers_info) != self.num_servers:
-            raise ValueError(f"Network adjacency matrix doesn't match with server definitions. Network is defined with {self.num_servers} nodes but {len(self.servers_info)} servers defined.")
+            # Assign server packet lengths by the maximum of max-packet-length of all flows that passes through this server
+            pkt_len = [fl.get("max_packet_length", 0) for fl in self.__get_flows(ser["id"])]    # packet lengths of the involved flows
+            if len(pkt_len) > 0:
+                ser["max_packet_length"] = max(pkt_len)
+            else:
+                warnings.warn("No flow passes through server \"{0}\", you may remove it from the analysis".format(ser["name"]))
+                self.server_no_flow.add(ser["id"])
+                ser['max_packet_length'] = 0
 
         
     def is_loaded(self)->bool:
@@ -171,12 +126,9 @@ class panco_analyzer():
             return False
         if self.adjacency_mat is None:
             return False
-        if self.num_flows==0 or self.num_flows==0:
-            return False
         return True
 
 
-    
 
 
     def build_network(self, use_shaper:bool=False)->None:
@@ -201,7 +153,9 @@ class panco_analyzer():
                 rl_curve = RateLatency(rate=rates[i], latency=latencies[i])
                 service_curves.append(rl_curve)
             if use_shaper:
-                tb_curve = TokenBucket(ser["packet_length"], ser["capacity"])
+                if not self.shaper_defined:
+                    raise RuntimeError("No shaper defined in network while trying to force applying shapers")
+                tb_curve = TokenBucket(ser["max_packet_length"], ser["capacity"])
                 shapers.append(tb_curve)
 
             # Append servers
@@ -295,81 +249,12 @@ class panco_analyzer():
 
         return delay_per_flow, None
 
-    
-    def assert_service_curve(self, service_curve:dict, server_id:int) -> None:
-        '''
-        assert the properties of a service curve
-        '''
-        lat_len  = len(service_curve["latencies"])
-        rate_len = len(service_curve["rates"])
-
-        # Ensure there's at least 1 line defined
-        if lat_len < 1:
-            raise SyntaxError(f"No latency defined in the service curve of server {server_id}")
-        if rate_len < 1:
-            raise SyntaxError(f"No service rate defined in the service curve of server {server_id}")
-
-        # Check number of segments of the service curve coherent in latencies/rates
-        min_len = min(lat_len, rate_len)
-        if lat_len != rate_len:
-            warnings.warn(f"Length of latencies and services rates are different in server {server_id}. {lat_len} numbers in latencies' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
-            service_curve["latencies"] = service_curve["latencies"][:min_len]
-            service_curve["rates"]     = service_curve["rates"][:min_len]
-
-        # Check the curve is convex
-        prev_latency = 0
-        prev_rate  = 0
-        for i in range(min_len):
-            curr_latency = service_curve["latencies"][i]
-            curr_rate    = service_curve["rates"][i]
-            if curr_latency <= prev_latency or curr_rate <= prev_rate:
-                warnings.warn(f"Service curve of server {server_id} doesn't satisfy convexity, this may cause the problem to be unsolvable", Warning)
-            
-            prev_latency = curr_latency
-            prev_rate  = curr_rate
-
-
-    def assert_arrival_curve(self, arrival_curve:dict, flow_id:int) -> None:
-        '''
-        assert the properties of an arrival curve
-        '''
-
-        bursts_len = len(arrival_curve["bursts"])
-        rates_len  = len(arrival_curve["rates"])
-
-        # Ensure there's at least 1 line defined
-        if bursts_len < 1:
-            raise SyntaxError(f"No burst defined in the arrival curve of flow {flow_id}")
-        if rates_len < 1:
-            raise SyntaxError(f"No arrival rate defined in the arrival curve of flow {flow_id}")
-
-        # Check number of segments of the arrival curve coherent in bursts/rates
-        min_len = min(bursts_len, rates_len)
-        if bursts_len != rates_len:
-            warnings.warn(f"Length of bursts and arrival rates are different in flow {flow_id}. {bursts_len} numbers in bursts' definition and {rates_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
-            arrival_curve["bursts"] = arrival_curve["bursts"][:min_len]
-            arrival_curve["rates"]  = arrival_curve["rates"][:min_len]
-
-        # Check the curve is concave
-        prev_burst = 0
-        prev_rate  = np.inf
-        for i in range(min_len):
-            curr_burst = arrival_curve["bursts"][i]
-            curr_rate  = arrival_curve["rates"][i]
-            if curr_burst <= prev_burst or curr_rate >= prev_rate:
-                warnings.warn(f"Arrival curve of flow {flow_id} doesn't satisfy concavity, this may cause the problem to be unsolvable", Warning)
-            
-            prev_burst = curr_burst
-            prev_rate  = curr_rate
-
 
     def __get_flows(self, server: int) -> list:
         '''
         Given a server j, find the indices of flow Fl(j) that passes server j
         the answer is returned in a list
         '''
-        assert len(self.flows_info) == self.num_flows
-
         output = []
         for fl in self.flows_info:
             if server in fl["path"]:

@@ -3,8 +3,9 @@ import numpy as np
 import pulp
 import json
 from .util import *
+from netscript.netdef import OutputPortNet
 
-from typing import List, Union
+from copy import deepcopy
 
 # set custom warning message
 warnings.showwarning = warning_override
@@ -24,27 +25,36 @@ class Linear_TFA():
 
 
     def __init__(self, filename:str=None) -> None:
+
         # General network information
         self.network_info = dict()
+        self.units = {'time': None, 'data': None, 'rate': None}
 
         # The adjacency matrix for the network topology
         self.adjacency_mat = None
-        self.num_servers = 0
 
         # The flows which pass through the network
         self.flows = []
-        self.num_flows = 0
 
         self.servers = []
         self.server_no_flow = set() # server without any flow passes through it, need to exclude from problem otherwise the problem is unbounded
 
         self.shaper_defined = True
 
+        ## Debug
         # The linear solver used to solve the problem
         self.solver = None
 
         if filename is not None:
             self.load(filename)
+
+    @property
+    def num_servers(self):
+        return len(self.servers)
+    
+    @property
+    def num_flows(self):
+        return len(self.flows)
 
 
     def load(self, filename:str) -> None:
@@ -64,98 +74,31 @@ class Linear_TFA():
 
     def parse(self, network_def:dict) -> None:
         '''
-        A network_def object should contain
-        
-        1. adjacency matrix:
-         - a 2D array representing a directed graph
-        
-        2. flows:
-         - a list of objects representing each flow.
-           a flow is defined by
-           - path: a list of non-repeating indicing of servers
-           - packet_length: max packet size arrives at this flow
-           - arrival_curve: an object defines a concave curve and contains
-             - bursts: a list indicates bursts of curves
-             - (times: a list of time where rates changes) (to be computed)
-             - rates: a decreasing list of arrival rates w.r.t. "times"
-        
-        3. servers:
-         - a list of objects representing each server.
-           a server is defined by
-           - capacity: the output capacity of server (shaper constraint)
-           - service_curve: an object defines a convex curve and contains
-             - latencies: a list indicates latencies of curves
-             - (times: a list of time where rates changes) (to be computed)
-             - rates: a increasing list of service rates w.r.t. "times"
+        Parse the network into the information needed for this tool
         '''
-        ## Load general network information
-        self.network_info = network_def["network"]
+        # Read by output port network
+        output_port_net = OutputPortNet(network_def=network_def)
 
-        ## Load adjacency matrix
-        self.adjacency_mat = np.array(network_def['adjacency_matrix'], dtype=np.int8)
-        self.num_servers   = self.adjacency_mat.shape[0]
-        # Assert the input is a valid adjacency matrix
-        if len(self.adjacency_mat.shape) != 2:
-            raise SyntaxError(f"Adjacency matrix dimension incorrect. Expect 2 but get {len(self.adjacency_mat.shape)}")
-        if self.adjacency_mat.shape[0] != self.adjacency_mat.shape[1]:
-            raise SyntaxError(f"Adjacency matrix should be square, get dimension {self.adjacency_mat.shape} instead")
+        # Load general network information
+        self.network_info  = deepcopy(output_port_net.network_info)
+        self.units = deepcopy(output_port_net.units)
+        self.adjacency_mat = output_port_net.adjacency_mat.copy()
+        self.flows = deepcopy(output_port_net.flows)
+        self.servers = deepcopy(output_port_net.servers)
 
-        ## Load flows
-        self.flows = []
-        for id, fl in enumerate(network_def['flows']):
-            path = fl["path"]
-
-            ## Check if it's a valid path
-            # 1. no recurring server along the path
-            if len(path) != len(set(path)):
-                warnings.warn(f"Skip flow {id} due to recurring server in its path: {path}")
-                continue
-            # 2. path definition matches the number of servers. i.e. 0 < path_length <= # of servers
-            if len(path) <= 0:
-                warnings.warn(f"Skip flow {id} because its path is empty")
-                continue
-            for s in path:
-                if s >= self.num_servers or s < 0:
-                    raise SyntaxError(f"Path definition in flow {id} is incorrect. Server ID should be 0-{self.num_servers-1}, get {s} instead.")
-            # 3. Each adjacent servers along the path is connected by a link
-            for si in range(len(path)-1):
-                if self.adjacency_mat[path[si], path[si+1]] == 0:
-                    raise ValueError(f"Path of flow {id} invalid. No link between server {path[si]} and {path[si+1]}")
-
+        # Check flows
+        for fl in self.flows:
             ## Check arrival curve syntax
             arrival_curve = fl["arrival_curve"]
             # assertion of arrival curve definition
-            self.assert_arrival_curve(arrival_curve=arrival_curve, flow_id=id)
+            self.assert_arrival_curve(arrival_curve=arrival_curve, flow_name=fl["name"])
             # Assign times where arrival curve changes rate
             self.__set_arrcur_times(arrival_curve)
 
-            ## Check packet length
-            if fl["packet_length"] < 0:
-                pkt_len = fl["packet_length"]
-                raise ValueError(f"Packet length of flow {id} is negative ({pkt_len}), should at least >= 0.")
-
-            self.flows.append(fl.copy())
-
-        self.num_flows = len(self.flows)
-
-        ## Load servers
-        self.servers = []
-        for ser_id, ser in enumerate(network_def["servers"]):
-
-            ## Assign packet length according to flow paths
-            pkt_len = [fl.get("packet_length", 0) for fl in self.__get_flows(ser_id)]    # packet lengths of the involved flows
-            # Assign the maximum possible packet length that passes through the server
-            if len(pkt_len) > 0:
-                ser['packet_length'] = max(pkt_len)
-            # it's possible that exists isolated server
-            else:
-                warnings.warn(f"No flow passes through server {ser_id}, you may remove it from the analysis", RuntimeWarning)
-                self.server_no_flow.add(ser_id)
-                ser['packet_length'] = 0
-
-            ## Check service curve
+        # Check servers
+        for ser in self.servers:
             # assertion of arrival curve definition
-            self.assert_service_curve(ser["service_curve"], ser_id)
+            self.assert_service_curve(ser["service_curve"], ser["name"])
             # Assign times where service curve changes rate
             self.__set_sercur_times(ser["service_curve"])
 
@@ -164,14 +107,16 @@ class Linear_TFA():
             if "capacity" not in ser:
                 self.shaper_defined = False
             if ser["capacity"] <= 0:
-                warnings.warn(f"Capacity of server {ser_id} is non-positive, should at least >0. Ignore using shaper.", RuntimeWarning)
+                warnings.warn("Capacity of server \"{0}\" is non-positive, should at least >0. Ignore using shaper.".format(ser["name"]))        
 
-            self.servers.append(ser.copy())
-            
-        if len(self.servers) != self.num_servers:
-            raise ValueError(f"Network adjacency matrix doesn't match with server definitions. Network is defined with {self.num_servers} nodes but {len(self.servers)} servers defined.")
-
-        
+            # Assign server packet lengths by the maximum of max-packet-length of all flows that passes through this server
+            pkt_len = [fl.get("max_packet_length", 0) for fl in self.__get_flows(ser["id"])]    # packet lengths of the involved flows
+            if len(pkt_len) > 0:
+                ser["max_packet_length"] = max(pkt_len)
+            else:
+                warnings.warn("No flow passes through server \"{0}\", you may remove it from the analysis".format(ser["name"]))
+                self.server_no_flow.add(ser["id"])
+                ser['max_packet_length'] = 0
 
 
     def set_utility(self, utility:float) -> dict:
@@ -229,58 +174,6 @@ class Linear_TFA():
             ser_rates[idx] = serv["service_curve"]["rates"][0]
         
         return max(max_agg_arr_rate / ser_rates)
-
-
-    def set_topology(self, adjacency_mat=np.ndarray) -> None:
-        '''
-        Assign network topology as a directed graph with a adjacency matrix
-        '''
-        # Assert the input is a valid adjacency matrix
-        assert len(adjacency_mat.shape) == 2
-        assert adjacency_mat.shape[0] == adjacency_mat.shape[1]
-
-        self.adjacency_mat = np.copy(adjacency_mat)
-        self.num_servers = adjacency_mat.shape[0]
-
-    
-    def add_links(self, links:Union[list,tuple]) -> None:
-        '''
-        Add new links, if the index exceed current number of servers, add new servers automatically.
-
-        Params:
-        links: a tuple or a list of tuples, each tuple pair indicates (source, destination) on the network
-        '''
-        
-        if type(links) is tuple:
-            self.__allocate_link(links)
-
-        elif type(links) is list:
-            for lk in links:
-                assert type(lk) is tuple
-                self.__allocate_link(lk)
-
-    def __allocate_link(self, link:tuple) -> None:
-        '''
-        Add a link in the network if both source and destination
-
-        Params:
-        link: a tuple of (source, destination) of server indices
-        '''
-        assert len(link) == 2
-
-        # Valid assignment
-        if link[0] < self.num_servers and link[1] < self.num_servers:
-            self.adjacency_mat[link] = 1
-        else:
-            # Create a larger network that fits the assignment
-            new_size = max(link)+1
-            new_adj_mat = np.zeros((new_size, new_size), dtype=np.int32)
-            # copy the original network
-            new_adj_mat[:self.num_servers, :self.num_servers] = self.adjacency_mat
-            # assign new link
-            new_adj_mat[link] = 1
-
-            self.adjacency_mat = np.copy(new_adj_mat)
 
 
     def solve(self) -> list:
@@ -567,7 +460,7 @@ class Linear_TFA():
                     if self.flows[fl_idx]["path"].index(server_id)+1 == self.flows[fl_idx]["path"].index(succ):
                         seq_flows.append(fl_idx)
 
-                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in seq_flows) <= server["packet_length"] + server["capacity"]*in_time[succ]
+                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in seq_flows) <= server["max_packet_length"] + server["capacity"]*in_time[succ]
 
         # Set objective function
         tfa_pp_prog += pulp.lpSum(delays)
@@ -596,7 +489,6 @@ class Linear_TFA():
         Given a server j, find the indices of flow Fl(j) that passes server j
         the answer is returned in a list
         '''
-        assert len(self.flows) == self.num_flows
 
         output = []
         for idx, fl in enumerate(self.flows):
@@ -622,41 +514,57 @@ class Linear_TFA():
             return np.argwhere(self.adjacency_mat[server])[:,0].tolist()
 
 
-    def assert_arrival_curve(self, arrival_curve:dict, flow_id:int) -> None:
+    def assert_arrival_curve(self, arrival_curve:dict, flow_name:str) -> None:
         '''
         assert the properties of an arrival curve
         '''
+        # Take min of the curves
+        # bursts should be increasing / rates should be decreasing
+        bursts = np.array(arrival_curve["bursts"])
+        rates  = np.array(arrival_curve["rates"])
 
-        bursts_len = len(arrival_curve["bursts"])
-        rates_len  = len(arrival_curve["rates"])
-
-        # Ensure there's at least 1 line defined
-        if bursts_len < 1:
-            raise SyntaxError(f"No burst defined in the arrival curve of flow {flow_id}")
-        if rates_len < 1:
-            raise SyntaxError(f"No arrival rate defined in the arrival curve of flow {flow_id}")
-
-        # Check number of segments of the arrival curve coherent in bursts/rates
-        min_len = min(bursts_len, rates_len)
-        if bursts_len != rates_len:
-            warnings.warn(f"Length of bursts and arrival rates are different in flow {flow_id}. {bursts_len} numbers in bursts' definition and {rates_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
-            arrival_curve["bursts"] = arrival_curve["bursts"][:min_len]
-            arrival_curve["rates"]  = arrival_curve["rates"][:min_len]
+        # rearrange based on bursts in increasing order
+        bur_order = np.argsort(bursts)
+        bursts = bursts[bur_order]
+        rates = rates[bur_order]
 
         # Check the curve is concave
+        valid_curve_points = np.ones_like(bursts, dtype=bool)
         prev_burst = 0
         prev_rate  = np.inf
-        for i in range(min_len):
-            curr_burst = arrival_curve["bursts"][i]
-            curr_rate  = arrival_curve["rates"][i]
-            if curr_burst <= prev_burst or curr_rate >= prev_rate:
-                warnings.warn(f"Arrival curve of flow {flow_id} doesn't satisfy concavity, this may cause the problem to be unsolvable", Warning)
+        for i in range(len(bursts)):
+            curr_burst = bursts[i]
+            curr_rate  = rates[i]
+
+            # we sort the curves by burst in increasing order,
+            # so we won't have smaller burst value than the previous one.
+            # Thus we consider 2 cases: equal and greater
+
+            # burst is equal, choose the smaller rate
+            if curr_burst == prev_burst:
+                if curr_rate > prev_rate:
+                    valid_curve_points[i-1] = False
+                else:
+                    valid_curve_points[i] = False
+                    continue    # don't need to update previous value
+
+            # burst is larger, but rate is larger -> ignore
+            elif curr_rate >= prev_rate:
+                valid_curve_points[i] = False
+                continue    # don't need to update previous value
+
+            # if curr_burst < prev_burst or curr_rate > prev_rate:
+            #     warnings.warn(f"Arrival curve of flow \"{flow_name}\" doesn't satisfy concavity, this may cause the problem to be unsolvable")
             
             prev_burst = curr_burst
             prev_rate  = curr_rate
 
+        # Update arrival curve
+        arrival_curve["bursts"] = bursts[valid_curve_points]
+        arrival_curve["rates"]  = rates[valid_curve_points]
 
-    def __set_arrcur_times(self, arrival_curve:dict) -> None:
+
+    def __set_arrcur_times(self, arrival_curve:dict) -> list:
         '''
         Add an extra list "times" in the curve that indicates the time snaps where the rate changes
         '''
@@ -671,41 +579,58 @@ class Linear_TFA():
 
         arrival_curve["times"] = turn_points
 
+        return turn_points
 
-    def assert_service_curve(self, service_curve:dict, server_id:int) -> None:
+
+    def assert_service_curve(self, service_curve:dict, server_name:str) -> None:
         '''
         assert the properties of a service curve
         '''
-        lat_len  = len(service_curve["latencies"])
-        rate_len = len(service_curve["rates"])
+        # Sort the curves
+        # latencies should be increasing / rates should be increasing
+        latencies = np.array(service_curve["latencies"])
+        rates  = np.array(service_curve["rates"])
 
-        # Ensure there's at least 1 line defined
-        if lat_len < 1:
-            raise SyntaxError(f"No latency defined in the service curve of server {server_id}")
-        if rate_len < 1:
-            raise SyntaxError(f"No service rate defined in the service curve of server {server_id}")
+        # rearrange based on latencies, increasing order
+        bur_order = np.argsort(latencies)
+        latencies = latencies[bur_order]
+        rates = rates[bur_order]
 
-        # Check number of segments of the service curve coherent in latencies/rates
-        min_len = min(lat_len, rate_len)
-        if lat_len != rate_len:
-            warnings.warn(f"Length of latencies and services rates are different in server {server_id}. {lat_len} numbers in latencies' definition and {rate_len} in rates'. Consider the shorter one ({min_len}) instead", SyntaxWarning)
-            service_curve["latencies"] = service_curve["latencies"][:min_len]
-            service_curve["rates"]     = service_curve["rates"][:min_len]
-
-        # Check the curve is convex
+        # Check the curve is convex and take max of rate-latency curves
+        valid_curve_points = np.ones_like(latencies, dtype=bool)
         prev_latency = 0
         prev_rate  = 0
-        for i in range(min_len):
-            curr_latency = service_curve["latencies"][i]
-            curr_rate    = service_curve["rates"][i]
-            if curr_latency <= prev_latency or curr_rate <= prev_rate:
-                warnings.warn(f"Service curve of server {server_id} doesn't satisfy convexity, this may cause the problem to be unsolvable", Warning)
-            
+        for i in range(len(latencies)):
+            curr_latency = latencies[i]
+            curr_rate    = rates[i]
+
+            # we sort the curves by latencies in increasing order,
+            # so we won't have smaller latencies value than the previous one.
+            # Thus we consider 2 cases: equal and greater
+
+            # latency is less, choose the larger rate
+            if curr_latency == prev_latency:
+                if curr_rate > prev_rate:
+                    valid_curve_points[i-1] = False
+                else:
+                    valid_curve_points[i] = False
+                    continue    # don't need to update previous value
+            # latency is larger, but rate is less -> ignore
+            elif curr_rate <= prev_rate:
+                valid_curve_points[i] = False
+                continue    # don't need to update previous value
+
+            # if curr_latency <= prev_latency or curr_rate <= prev_rate:
+            #     warnings.warn(f"Service curve of server \"{server_name}\" doesn't satisfy convexity, this may cause the problem to be unsolvable")
             prev_latency = curr_latency
-            prev_rate  = curr_rate
+            prev_rate    = curr_rate
+
+        # Update arrival curve
+        service_curve["latencies"] = latencies[valid_curve_points]
+        service_curve["rates"]  = rates[valid_curve_points]
 
     
-    def __set_sercur_times(self, service_curve:dict) -> None:
+    def __set_sercur_times(self, service_curve:dict) -> list:
         '''
         Add an extra list "times" in the curve that indicates the time snaps where the rate changes
         '''
@@ -716,3 +641,5 @@ class Linear_TFA():
             turn_points[t] = (service_curve["rates"][t+1]*service_curve["latencies"][t+1] - service_curve["rates"][t]*service_curve["latencies"][t]) / (service_curve["rates"][t+1] - service_curve["rates"][t])
 
         service_curve["times"] = turn_points
+
+        return turn_points

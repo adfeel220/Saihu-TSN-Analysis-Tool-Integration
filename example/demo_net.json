@@ -1,0 +1,74 @@
+{
+    "network":
+    {
+        "name": "demo",
+        "packetizer": true,
+        "multiplexing": ["FIFO", "TDMI"],
+        "analysis_option": ["IS", "CEIL", "MOH"],
+        "time_unit": "us",
+        "data_unit": "B",
+        "rate_unit": "MBps"
+    },
+
+    "flows":
+    [
+        {
+            "name": "f0",
+            "path": ["s0-0", "s1-0"],
+            "arrival_curve": {
+                "bursts": [1, "2kB"],
+                "rates": [1, 0.5]
+            },
+            "min_packet_length": 1,
+            "max_packet_length": 1
+        },
+        {
+            "name": "f1",
+            "path": ["s0-0", "s1-1"],
+            "arrival_curve": {
+                "bursts": [1, 2],
+                "rates": [1, 0.5]
+            },
+            "min_packet_length": 1,
+            "max_packet_length": 1
+        },
+        {
+            "name": "f2",
+            "path": ["s1-0"],
+            "arrival_curve": {
+                "bursts": [1, 0.5,0.7, 2],
+                "rates": [1, 2, 2, 0.7]
+            },
+            "min_packet_length": 1,
+            "max_packet_length": 1
+        }
+    ],
+
+    "servers":
+    [
+        {
+            "name": "s0-0",
+            "service_curve": {
+                "latencies": [1, 2],
+                "rates": [4,10]
+            },
+            "capacity": 10
+        },
+        {
+            "name": "s1-0",
+            "service_curve": {
+                "latencies": [1,2],
+                "rates": [4,10]
+            },
+            "capacity": 10
+        },
+        {
+            "name": "s1-1",
+            "service_curve": {
+                "latencies": [1,2, 1.4, 2],
+                "rates": [4,10,7, 20]
+            },
+            "capacity": 10
+        }
+    ]
+}
