@@ -29,6 +29,18 @@ keysInWopanetXML = {
     "flow_path_step_name": "node"
 }
 
+# The default unit used when it's written as a pure string number
+Wopanet_default_units = {
+    "time": "ms",
+    "data": "B",
+    "rate": "bps"
+}
+
+network_param = {
+    "packetizer": "PK",
+    "multiplexing": {"FIFO", "ARBITRARY"},
+    "analysis_option": ["IS", "CEIL", "MOH", "TDMI"]
+}
 
 def warning_override(message, category = UserWarning, filename = '', lineno = -1, file=None, line=None):
     '''
@@ -64,7 +76,7 @@ class PhysicalNet:
     network  : dict
     nodes    : dict     # stations or switches
     flows    : dict
-    links    : dict     # key=from_which_physical_node, value=list of {"dest": to_which_physical_node, "output_port": from_which_port_of_source}
+    links    : dict     # key=from_which_physical_node, value=list of {"dest": to_which_physical_node, "output_port": from_which_port_of_source, "dest_port": to_which_port_of_destination}
 
     def __init__(self, root:xml.etree.ElementTree=None):
         self.network = dict()
@@ -149,14 +161,17 @@ class PhysicalNet:
             except KeyError as e:
                 raise xml.etree.ElementTree.ParseError("Link needs to have \"%s\" and \"%s\".".format(keysInWopanetXML["link_from"], keysInWopanetXML["link_to"])) from e
 
-            from_port = lk.attrib.pop(keysInWopanetXML["link_from_port"], "0")
+            from_port = lk.attrib.pop(keysInWopanetXML["link_from_port"], "o0")
+            to_port = lk.attrib.pop(keysInWopanetXML["link_to_port"], "i0")
 
             if from_port not in self.nodes[from_node]["used_output_ports"]:
                 self.nodes[from_node]["used_output_ports"].append(from_port)
 
             link_info = {
                 "dest": to_node,
-                "output_port": from_port
+                "output_port": from_port,
+                "dest_port": to_port,
+                **lk.attrib
             }
             if from_node not in self.links:
                 self.links[from_node] = [link_info]
@@ -206,7 +221,7 @@ class PhysicalNet:
 
     def get_output_ports(self, ignore_dummy:bool=False)->list:
         '''
-        Return a list of output port dict containing name "[physical node name]_[port]" and service curve information
+        Return a list of output port dict containing name "[physical node name]-[port]" and service curve information
 
         ignore_dummy: true if we want to ignore nodes where no services defined on them
         '''
@@ -215,15 +230,24 @@ class PhysicalNet:
             if "service-rate" not in content and ignore_dummy:
                 continue
 
-            output_ports = content.pop("used_output_ports")
+            node_info = deepcopy(content)
+            output_ports = node_info.pop("used_output_ports")
             # Special case: when no output port used (no flow passes through node)
             if len(output_ports) == 0:
-                port_list.append({"name": node_name, "physical_node":node_name, "port":None, **content})
+                port_list.append({"name": node_name, "physical_node":node_name, "port":None, **node_info})
                 continue
 
-            for port in output_ports:
+            for pid, port in enumerate(output_ports):
                 op_name = f"{node_name}-{port}"
-                port_list.append({"name": op_name, "physical_node":node_name, "port":port, **content})
+                # Check if there's link overwrittten parameters
+                if "service-latency" in self.links[node_name][pid]:
+                    node_info["service-latency"] = self.links[node_name][pid]["service-latency"]
+                if "service-rate" in self.links[node_name][pid]:
+                    node_info["service-rate"] = self.links[node_name][pid]["service-rate"]
+                if "transmission-capacity" in self.links[node_name][pid]:
+                    node_info["transmission-capacity"] = self.links[node_name][pid]["transmission-capacity"]
+
+                port_list.append({"name": op_name, "physical_node":node_name, "port":port, **node_info})
 
         return port_list
     
@@ -478,7 +502,7 @@ class OutputPortNet:
             capacity = try_raise(f"Parsing servers.capacity of \"{ser_name}\"", capacity, self._convert_unit, capacity, unit["rate"], "rate")
 
             # check server capacity validity
-            if ser["capacity"] <= 0:
+            if capacity <= 0:
                 raise ValueError(f"Capacity of server {ser_name} is non-positive, should at least >0.")
 
             ser["capacity"] = capacity

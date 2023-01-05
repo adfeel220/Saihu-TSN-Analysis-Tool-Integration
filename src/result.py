@@ -138,6 +138,18 @@ class TSN_result():
         return self._units
 
     @property
+    def time_unit(self)->str:
+        return self._units["time"]
+
+    @property
+    def data_unit(self)->str:
+        return self._units["data"]
+
+    @property
+    def rate_unit(self)->str:
+        return self._units["rate"]
+
+    @property
     def converted_from(self)->bool:
         return self._converted_from
 

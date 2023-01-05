@@ -165,7 +165,7 @@ class TSN_Analyzer():
         print("Writing result file...", end="")
 
         if len(self.results) == 0:
-            print("Abort writing result: No results analyzed before")
+            print("No result is written to file: No results analyzed before")
             return
 
         ## Start writing
@@ -187,26 +187,7 @@ class TSN_Analyzer():
             output_index += 1
 
             # Retrieve the smallest unit among all results
-            units = {"time": None, "data": None, "rate": None}
-            for res in results:
-                for ut in units.keys():
-                    if ut=="time":
-                        get_func = unit_util.get_time_unit
-                    elif ut=="data":
-                        get_func = unit_util.get_data_unit
-                    elif ut=="rate":
-                        get_func = unit_util.get_rate_unit
-                    else:
-                        raise RuntimeError(f"Unrecognized unit: {ut}")
-
-                    if units[ut] is None:
-                        units[ut] = res.units[ut]
-                    # Both units and res.units are not None
-                    elif res.units[ut] is not None:
-                        # Write the result units in the stored unit
-                        unit_val = get_func(res.units[ut], units[ut])
-                        if unit_val < 1:
-                            units[ut] = res.units[ut]
+            units = self.get_smallest_unit(results)
             
             result_json = dict()
             result_json["name"] = net_name
@@ -262,7 +243,7 @@ class TSN_Analyzer():
         print("Writing report...", end="")
 
         if len(self.results) == 0:
-            print("Abort writing result: No results analyzed before")
+            print("No report generated: No results analyzed before")
             return
 
         outpath = os.path.abspath(os.path.dirname(output_file))
@@ -283,13 +264,11 @@ class TSN_Analyzer():
             res_sorted = dict(sorted(res_sorted.items()))
             res_sorted = dict(zip(["{t}-{m}".format(t=r.tool, m=r.method) for r in res_sorted.values()], res_sorted.values()))
 
-            ## Output tool-method specific results
-            # divide the results by method used
-            # res_by_methods = dict()
-            # for r in res:
-            #     if r.method not in res_by_methods:
-            #         res_by_methods[r.method] = list()
-            #     res_by_methods[r.method].append(r)
+            self._units = self.get_smallest_unit(res)
+            self._units = {
+                "flow_delay": "{m}{u}".format(m=self.flow_delay_mul,u=unit_util.split_multiplier_unit(self._units["time"])[1]),
+                "server_delay": "{m}{u}".format(m=self.serv_delay_mul, u=unit_util.split_multiplier_unit(self._units["time"])[1])
+            }
 
             # Determine report filename
             output_file = check_file_ext(output_file, "md")
@@ -303,7 +282,7 @@ class TSN_Analyzer():
             if comment is not None:
                 mdFile.new_line("**Comment:**")
                 mdFile.new_paragraph(comment)
- 
+
             ###############
             # Output part #
             ###############
@@ -424,11 +403,11 @@ class TSN_Analyzer():
                 continue
 
             if self.output_shaping == FORCE_SHAPER.AUTO or self.output_shaping == FORCE_SHAPER.ON:
-                include_tech = ["FIFO+IS"]
-                exclude_tech = []
+                include_tech = ["IS"]
+                exclude_tech = ["ARBITRARY"] # not a wopanet command
             elif self.output_shaping == FORCE_SHAPER.OFF:
-                include_tech = ["FIFO"]
-                exclude_tech = ["IS"]
+                include_tech = []
+                exclude_tech = ["IS", "ARBITRARY"]
 
             # xTFA use the "technology" entry defined in the file for shaper usage, generate a new file that enforces the shaper technology
             file_enforce_method = self.script_handler.enforce_technology(in_filename=netfile, include_tech=include_tech, exclude_tech=exclude_tech, out_filename=add_text_in_ext(os.path.join(self._temp_path, "tempnet.xml"), "enforced"))
@@ -444,6 +423,7 @@ class TSN_Analyzer():
             start_time = time()
             xtfa_net.compute()
             exec_time = time() - start_time
+                    
             # determine execution time multiplier
             new_time, mul = unit_util.decide_multiplier(exec_time)
             if self.exec_time_mul is None:
@@ -498,6 +478,7 @@ class TSN_Analyzer():
                 flow_cmu_delays = flow_cmu_delays,
                 flow_delays = flow_delays,
                 exec_time   = exec_time,
+                units = {"time": "s", "data": "b", "rate": "bps"},
                 network_source      = netfile,
                 from_converted_file = from_converted_file
             )
@@ -548,10 +529,10 @@ class TSN_Analyzer():
             server_delays = dict()
             server_names = list()
             for serv_id, server in enumerate(linear_solver.servers):
-                server_names.append(server.get("name", f"sw_{serv_id}"))
+                server_names.append(server.get("name", f"s{serv_id}"))
                 server_delays[server_names[-1]] = delays[serv_id]
             # determine min multiplier
-            min_mul = unit_util.decide_min_multiplier(server_delays.values())
+            min_mul = unit_util.decide_min_multiplier(server_delays.values(), unit=linear_solver.units["time"])
             if self.serv_delay_mul is None:
                 self.serv_delay_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
@@ -571,7 +552,7 @@ class TSN_Analyzer():
                 flow_delays[flow_name] = delay
             
             # determine delay multiplier
-            min_mul = unit_util.decide_min_multiplier(flow_delays.values())
+            min_mul = unit_util.decide_min_multiplier(flow_delays.values(), unit=linear_solver.units["time"])
             if self.flow_delay_mul is None:
                 self.flow_delay_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.flow_delay_mul]:
@@ -642,21 +623,11 @@ class TSN_Analyzer():
                 self.exec_time_mul = mul
 
             server_delays = None
-            total_delay = None
             if delay_per_server is not None:
                 server_delays = dict(zip(panco_anzr.server_names, delay_per_server))
-                total_delay = sum(delay_per_server)
 
                 # determine min multiplier
-                min_mul = unit_util.decide_min_multiplier(server_delays.values())
-                if self.serv_delay_mul is None:
-                    self.serv_delay_mul = min_mul
-                elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
-                    self.serv_delay_mul = min_mul
-
-            else:
-                # determine min multiplier
-                min_mul = unit_util.decide_min_multiplier(delay_per_flow)
+                min_mul = unit_util.decide_min_multiplier(server_delays.values(), unit=panco_anzr.units["time"])
                 if self.serv_delay_mul is None:
                     self.serv_delay_mul = min_mul
                 elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
@@ -669,7 +640,7 @@ class TSN_Analyzer():
 
             flow_delays = dict(zip(panco_anzr.flow_names, delay_per_flow))
             # determine delay multiplier
-            min_mul = unit_util.decide_min_multiplier(flow_delays.values())
+            min_mul = unit_util.decide_min_multiplier(flow_delays.values(), unit=panco_anzr.units["time"])
             if self.flow_delay_mul is None:
                 self.flow_delay_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.flow_delay_mul]:
@@ -739,11 +710,11 @@ class TSN_Analyzer():
         # determine if network is cyclic
         self.script_handler.load_opnet(netfile)
         if self.script_handler.is_cyclic():
-            print("Abort: network is cyclic")
+            print("Skip: network is cyclic and not allowed by DNC")
             return
         
         # use the formatted network
-        formatted_net_name = os.path.join(self._temp_path, "tempnet.json")
+        formatted_net_name = os.path.join(self._temp_path, "dnc_file.json")
         self.script_handler.op_net.dump_json(formatted_net_name)
             
         try:
@@ -755,7 +726,9 @@ class TSN_Analyzer():
         # parse individual flows/methods into dictionaries
         result_by_methods = self._split_dnc_result(dnc_result_json_str)
         if len(result_by_methods) == 0:
-            raise RuntimeError("No result obtained from DNC solver!")
+            print("Skip DNC analysis")
+            return
+            # raise RuntimeError("No result obtained from DNC solver!")
 
         # extract result obtained by each method
         for method, res_per_method in result_by_methods.items():
@@ -770,7 +743,7 @@ class TSN_Analyzer():
             # determine delays
             result["server_delays"] = res_per_method[0]["server_delays"]
             # determine min multiplier
-            min_mul = unit_util.decide_min_multiplier(result["server_delays"].values())
+            min_mul = unit_util.decide_min_multiplier(result["server_delays"].values(), unit=result["units"]["time"])
             if self.serv_delay_mul is None:
                 self.serv_delay_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.serv_delay_mul]:
@@ -779,7 +752,7 @@ class TSN_Analyzer():
             # determine backlogs
             result["server_backlogs"] = res_per_method[0]["server_backlogs"]
             # determine min multiplier
-            min_mul = unit_util.decide_min_multiplier(result["server_backlogs"].values())
+            min_mul = unit_util.decide_min_multiplier(result["server_backlogs"].values(), unit=result["units"]["data"])
             if self.backlog_mul is None:
                 self.backlog_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.backlog_mul]:
@@ -817,7 +790,7 @@ class TSN_Analyzer():
                 result["exec_time"] += res_per_flow["exec_time"]
 
             # determine delay multiplier
-            min_mul = unit_util.decide_min_multiplier(result["flow_delays"].values())
+            min_mul = unit_util.decide_min_multiplier(result["flow_delays"].values(), unit=result["units"]["time"])
             if self.flow_delay_mul is None:
                 self.flow_delay_mul = min_mul
             elif unit_util.multipliers[min_mul] < unit_util.multipliers[self.flow_delay_mul]:
@@ -948,7 +921,7 @@ class TSN_Analyzer():
             try:
                 result_json = json.loads(result_per_flow)
             except Exception as e:
-                print("Abort. Cannot obtain DNC result. Could be DNC interface problem or Java problem.")
+                print("Skip. Cannot obtain DNC result. Could be DNC interface problem or Java problem.")
                 return result_by_methods
                 # raise RuntimeError("Incorrect DNC output, you may need to check the DNC output")
 
@@ -1030,7 +1003,8 @@ class TSN_Analyzer():
         tm_results: a dictionary with key="tool-method", value=corresponding result
         '''
         mdFile.new_header(level=2, title=f"Per flow end-to-end delay bound")
-        mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.flow_delay_mul]}seconds")
+        # mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.flow_delay_mul]}seconds")
+        mdFile.new_line("Unit in {}".format(self._units["flow_delay"]))
 
         paths = dict()
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
@@ -1046,7 +1020,8 @@ class TSN_Analyzer():
         for tlm, res in tm_results.items():
             paths.update(res.flow_paths)
             for flow_name, flow_delay in res.flow_delays.items():
-                table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay / unit_util.multipliers[self.flow_delay_mul])
+                table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay * unit_util.get_time_unit(res.time_unit, self._units["flow_delay"]))
+                # table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay / unit_util.multipliers[self.flow_delay_mul])
 
         # write into MD
         table_res = table_res.flatten().tolist()
@@ -1104,7 +1079,8 @@ class TSN_Analyzer():
             return
         
         mdFile.new_header(level=2, title=f"Per server {title_name} bound")
-        mdFile.new_line(f"Unit in {unit_util.multiplier_names[multiplier]}{unit}")
+        mdFile.new_line("Unit in {}".format(self._units["server_delay"]))
+        # mdFile.new_line(f"Unit in {unit_util.multiplier_names[multiplier]}{unit}")
 
         # Table with mapping assigned
         server_mapping = self._create_mapping(tm_results.values(), ["graph", "nodes"])
@@ -1121,13 +1097,15 @@ class TSN_Analyzer():
             if getattr(res, attr_name) is None:
                 continue
             for server_name, attr_num in getattr(res, attr_name).items():
-                table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num / unit_util.multipliers[multiplier])
+                table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num * unit_util.get_time_unit(res.time_unit, self._units["server_delay"]))
+                # table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num / unit_util.multipliers[multiplier])
 
             summary = getattr(res,summary_attr)
             if summary is None:
                 table_res[-1,tlm_mapping[tlm]+1] = "N/A"
             else:
-                table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary/unit_util.multipliers[multiplier])
+                table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary * unit_util.get_time_unit(res.time_unit, self._units["server_delay"]))
+                # table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary/unit_util.multipliers[multiplier])
 
         # write into MD
         table_res = table_res.flatten().tolist()
@@ -1279,3 +1257,37 @@ class TSN_Analyzer():
                         index += 1
         return y
 
+
+    def get_smallest_unit(self, results:list=None) -> dict:
+        '''
+        Obtain the smallest units among the results
+        '''
+        if results is None:
+            results = self.results
+
+        units = {"time": None, "data": None, "rate": None}
+        if len(results) == 0:
+            return units
+
+        # Retrieve the smallest unit among all results
+        for res in results:
+            for ut in units.keys():
+                if ut=="time":
+                    get_func = unit_util.get_time_unit
+                elif ut=="data":
+                    get_func = unit_util.get_data_unit
+                elif ut=="rate":
+                    get_func = unit_util.get_rate_unit
+                else:
+                    raise RuntimeError(f"Unrecognized unit: {ut}")
+
+                if units[ut] is None:
+                    units[ut] = res.units[ut]
+                # Both units and res.units are not None
+                elif res.units[ut] is not None:
+                    # Write the result units in the stored unit
+                    unit_val = get_func(res.units[ut], units[ut])
+                    if unit_val < 1:
+                        units[ut] = res.units[ut]
+
+        return units

@@ -4,7 +4,6 @@ import xml.dom.minidom as md
 import json
 from copy import deepcopy
 import numpy as np
-from typing import Union
 
 # Solve path issue
 import os.path
@@ -13,6 +12,7 @@ sys.path.append(os.path.dirname(__file__))
 
 # Import my own modules
 from netdef import PhysicalNet, OutputPortNet
+from netdef import network_param, Wopanet_default_units
 from unit_util import *
 
 def check_file_ext(fpath:str, ext:str) -> str:
@@ -139,7 +139,7 @@ class NetworkScriptHandler:
         net_attribs = dict(net_elems[0].attrib)
 
         # Make sure at least has "name" attribute
-        technologies = net_attribs.pop("technology", include_tech)
+        technologies = net_attribs.pop("technology", "")
         technologies = set(technologies.split("+"))
         technologies = technologies.union(include_tech)
         technologies = technologies - set(exclude_tech)
@@ -185,37 +185,39 @@ class NetworkScriptHandler:
         ## Create output port network
         json_out = dict()
         # Network information
-        packet_length = float(self.phy_net.network.get("maximum-packet-size", 0))
+        technologies = self.phy_net.network.pop("technology", []) # list of technologies split by '+'
+        network = {
+            **self.phy_net.network,
+            "time_unit": Wopanet_default_units["time"],
+            "data_unit": Wopanet_default_units["data"],
+            "rate_unit": Wopanet_default_units["rate"],
+            "converted": ifpath,
+        }
 
+        network["packetizer"] = network_param["packetizer"] in technologies
+        network["multiplexing"] = "FIFO" if "FIFO" in technologies else "ARBITRARY"
+        network["analysis_option"] = list(set(network_param["analysis_option"]).intersection(technologies))                
+
+        max_packet_length = self.phy_net.network.pop("maximum-packet-size", None)
+        if max_packet_length is not None:
+            network["max_packet_length"] = max_packet_length
+        min_packet_length = self.phy_net.network.pop("minimum-packet-size", None)
+        if min_packet_length is not None:
+            network["min_packet_length"] = min_packet_length
+        default_capacity = self.phy_net.network.pop("transmission-capacity", None)
+        if default_capacity is not None:
+            network["capacity"] = default_capacity
 
         # Count the number of output ports
         port_list = self.phy_net.get_output_ports(ignore_dummy=True)
-        port_num = len(port_list)
-
-        # fill the topology
-        adjacency_matrix = np.zeros((port_num, port_num), dtype=int)
-        for row, port_info in enumerate(port_list):
-            dests = self.phy_net.links.get(port_info["physical_node"], [])
-            for dt in dests:
-                next_dest = self.phy_net.links.get(dt["dest"], [])
-                # dt_idx = get_portlist_index(port_list, dt["dest"], dt["output_port"])
-                # if dt_idx is not None:
-                #     adjacency_matrix[row, dt_idx] = 1
-                for ndt in next_dest:
-                    src_idx = get_portlist_index(port_list, port_info["physical_node"], dt["output_port"])
-                    dt_idx = get_portlist_index(port_list, dt["dest"], ndt["output_port"])
-                    if src_idx is not None and dt_idx is not None:
-                        adjacency_matrix[row, dt_idx] = 1
-
-
-        adjacency_matrix = adjacency_matrix.tolist()
         
         # Construct servers            
         servers = list()    # servers in output-port abstractions
         for port in port_list:
+
             service_curve = {
-                "latencies": [parse_num_unit_time(port.pop("service-latency"))],
-                "rates": [parse_num_unit_rate(port.pop("service-rate"))]
+                "latencies": [port.pop("service-latency")],
+                "rates": [port.pop("service-rate")]
             }
 
             capacity = None
@@ -224,7 +226,7 @@ class NetworkScriptHandler:
 
             server_info = {"service_curve": service_curve, **port}
             if capacity is not None:
-                server_info["capacity"] = float(capacity)
+                server_info["capacity"] = capacity
 
             servers.append(server_info)
 
@@ -236,31 +238,37 @@ class NetworkScriptHandler:
             if attrib["arrival-curve"] != "leaky-bucket":
                 raise NotImplementedError("The format currently only supports leaky-bucket arrival curves")
 
-            burst = attrib.pop("lb-burst")
-            rate  = attrib.pop("lb-rate")
             arrival_curve = {
-                "bursts": [parse_num_unit_data(burst)],
-                "rates": [parse_num_unit_rate(rate)]
+                "bursts": [attrib.pop("lb-burst")],
+                "rates": [attrib.pop("lb-rate")]
             }
+
+            # Get flow path
             path = []
             for step in fl_data["path"]:
                 port_idx = get_portlist_index(port_list, step["node"], step["port"])
                 if port_idx is not None:
-                    path.append(port_idx)
+                    path.append(servers[port_idx]["name"])
 
-            flow_packet_length = attrib.get("maximum-packet-size", None)
-            if flow_packet_length is None:
-                flow_packet_length = packet_length
-            flow_packet_length = parse_num_unit_data(flow_packet_length)
-            
-            flow_info = {"name": fl_name,"path": path, "arrival_curve": arrival_curve, "packet_length": flow_packet_length, **attrib}
+            # Assign the loaded information into the flow info
+            flow_info = {"name": fl_name,"path": path, "arrival_curve": arrival_curve, **attrib}
+
+            # Get flow packet length max/min
+            # max
+            flow_max_packet_length = flow_info.pop("maximum-packet-size", None)
+            if flow_max_packet_length is not None:
+                flow_info["max_packet_length"] = flow_max_packet_length
+
+            # min
+            flow_min_packet_length = flow_info.pop("minimum-packet-size", None)
+            if flow_min_packet_length is not None:
+                flow_info["min_packet_length"] = flow_min_packet_length
+
             flows.append(flow_info)
-
         
         # Dump file
         json_out = {
-            "network": {"converted":ifpath, **self.phy_net.network},
-            "adjacency_matrix": adjacency_matrix,
+            "network": network,
             "flows": flows,
             "servers": servers
         }
@@ -294,7 +302,23 @@ class NetworkScriptHandler:
 
         ## General network information
         network_info = deepcopy(self.op_net.network_info)
-        network_info["technology"] = "+".join(network_info.get("technology", ["FIFO"]))
+        # Get technology
+        technology = list()
+        pk = network_info.pop("packetizer", False)
+        if pk:
+            technology.append("PK")
+        if network_info.pop("multiplexing").upper() == "FIFO":
+            technology.append("FIFO")
+        technology += network_info.pop("analysis_option", [])
+        network_info["technology"] = "+".join(technology)
+
+        # Get units
+        units = {
+            "time": network_info.pop("time_unit", None),
+            "data": network_info.pop("data_unit", None),
+            "rate": network_info.pop("rate_unit", None)
+        }
+
         network_info["converted"] = ifpath
         network_info = ET.SubElement(root, "network", network_info)
 
@@ -325,12 +349,15 @@ class NetworkScriptHandler:
             # Determine "station" or "switch", where "switch" being default
             server_type = server.pop("type", "switch")
 
+            # Remove id
+            server.pop("id", None)
+
             # Determine name of the server by the priority: physical_name -> name -> default name
-            phy_name = f"{server_type[:2]}_{sid}"
+            phy_name = f"{server_type[:2]}{sid}"
             phy_name = server.pop("name", phy_name)
             phy_name = server.pop("physical_node", phy_name)
 
-            prt_name = server.pop("port", "0")
+            prt_name = server.pop("port", "o0")
             
             # Read service curve
             s_curve  = server.pop("service_curve")
@@ -341,11 +368,11 @@ class NetworkScriptHandler:
             # Write server information
             server_info = {
                 "name": phy_name,
-                "service-latency": f"{latency}s",
-                "service-rate": str(rate)
+                "service-latency": "{latency}".format(latency=latency * get_time_unit(units["time"], Wopanet_default_units["time"])),
+                "service-rate": "{rate}".format(rate=rate * get_rate_unit(units["rate"], Wopanet_default_units["rate"]))
             }
             if capacity is not None:
-                server_info["transmission-capacity"] = str(capacity)
+                server_info["transmission-capacity"] = "{capacity}".format(capacity=capacity * get_rate_unit(units["rate"], Wopanet_default_units["rate"]))
             
             # Multiple output port may map to the same physical node. In this case we only need to add one switch/station to the network
             if phy_name not in server_names:
@@ -365,7 +392,7 @@ class NetworkScriptHandler:
             link_info = {
                 "from": sources[fid],
                 "to": server_names[first_node],
-                "fromPort": "0",
+                "fromPort": "o0",
                 "toPort": port_names[first_node],
                 "name": f"lk:{sources[fid]}_0-{server_names[first_node]}_{port_names[first_node]}"
             }
@@ -375,7 +402,7 @@ class NetworkScriptHandler:
                 "from": server_names[last_node],
                 "to": sinks[fid],
                 "fromPort": port_names[last_node],
-                "toPort": "0",
+                "toPort": "i0",
                 "name": f"lk:{server_names[last_node]}_{port_names[last_node]}-{sinks[fid]}_0"
             }
             ET.SubElement(root, "link", link_info)
@@ -400,10 +427,14 @@ class NetworkScriptHandler:
             flow = deepcopy(flow)
 
             curve_type = flow.pop("arrival-curve", 'leaky-bucket')
-            max_packet_len = flow.pop("packet_length", None)
+            max_packet_len = flow.pop("max_packet_length", None)
+            min_packet_len = flow.pop("min_packet_length", None)
 
             fl_name = f"fl_{fid}"
             fl_name = flow.pop("name", fl_name)
+
+            # Remove id
+            flow.pop("id", None)
 
             a_curve = flow.pop("arrival_curve")
             burst = a_curve["bursts"][0]
@@ -411,15 +442,28 @@ class NetworkScriptHandler:
 
             path = flow.pop("path")
 
+            if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
+                burst_str = "{b}{unit}".format(b=burst, unit=units["data"])
+            else:
+                burst_str = str(burst * get_data_unit(units["data"], Wopanet_default_units["data"]))
+
             flow_info = {
                 "name": fl_name,
                 "arrival-curve": curve_type,
-                "lb-burst": f"{int(burst)}b",   # bit is discrete so must be integer
-                "lb-rate": str(rate),
+                "lb-burst": burst_str,
+                "lb-rate": "{rate}".format(rate=rate * get_rate_unit(units["rate"], Wopanet_default_units["rate"])),
                 "source": sources[fid]
             }
             if max_packet_len is not None:
-                flow_info["maximum-packet-size"] = str(int(max_packet_len))
+                if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
+                    flow_info["maximum-packet-size"] = "{max_pkl}{unit}".format(max_pkl=max_packet_len, unit=units["data"])
+                else:
+                    flow_info["maximum-packet-size"] = str(max_packet_len * get_data_unit(units["data"], Wopanet_default_units["data"]))
+            if min_packet_len is not None:
+                if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
+                    flow_info["minimum-packet-size"] = "{min_pkl}{unit}".format(min_pkl=min_packet_len, unit=units["data"])
+                else:
+                    flow_info["minimum-packet-size"] = str(min_packet_len * get_data_unit(units["data"], Wopanet_default_units["data"]))
 
             flow_elem = ET.SubElement(root, "flow", flow_info, **flow)
             path_elem = ET.SubElement(flow_elem, "target")

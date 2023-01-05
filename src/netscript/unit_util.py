@@ -59,6 +59,79 @@ def is_number(num_str:str) -> bool:
     else:
         return True
 
+def is_time_unit(unitstr:str) -> bool:
+    '''
+    Determine if the unit is a time unit
+    '''
+    for tu in time_units:
+        if unitstr.endswith(tu):
+            return True
+    return False
+
+def is_data_unit(unitstr:str) -> bool:
+    '''
+    Determine if the unit is a data unit
+    '''
+    for tu in data_units:
+        if unitstr.endswith(tu):
+            return True
+    return False
+
+def is_rate_unit(unitstr:str) -> bool:
+    '''
+    Determine if the unit is a rate unit
+    '''
+    try:
+        interpret_rate(unitstr[-3:])
+        return True
+    except ValueError:
+        return False
+
+def split_multiplier_unit(unitstr:str) -> tuple:
+    '''
+    split the multiplier and unit from the combination
+    '''
+    # time/data unit without multiplier
+    if len(unitstr)==1:
+        return '', unitstr
+    # time/data unit
+    if len(unitstr)==2:
+        return unitstr[0], unitstr[1]
+    # pure rate unit
+    if len(unitstr)==3:
+        return '', unitstr
+    # rate unit with multiplier
+    if len(unitstr)==4:
+        return unitstr[0], unitstr[1:]
+    
+    return '', ''
+        
+
+
+def split_num_unit(numstr:str, default_unit:str='') -> tuple:
+    '''
+    split the number string with unit into number and unit
+
+    Input:
+    -----------
+    numstr: [str] the number string with unit. e.g. "1.2ms" returns (1.2, "ms")
+    default_unit: [str] the return value unit if the numstr is a number
+
+    Output:
+    -----------
+    num: [float] the number in the string
+    unit: [str] the unit attached to the number string
+    '''
+    if is_number(numstr):
+        return float(numstr), default_unit
+
+    for i in range(1, len(numstr)+1):
+        if is_number(numstr[:-i]):
+            return float(numstr[:-i]), numstr[-i:].replace(' ','')
+    
+    return None, None
+
+
 def interpret_rate(unit:str) -> float:
     '''
     Check if it's a valid rate unit derived from time and data units.
@@ -128,6 +201,9 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
     
     if is_number(numstr):
         return float(numstr)
+
+    if numstr is None:
+        return None
     
     if target_unit is None:
         raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
@@ -219,6 +295,9 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
     if is_number(numstr):
         return float(numstr)
     
+    if numstr is None:
+        return None
+
     if target_unit is None:
         raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
 
@@ -279,11 +358,11 @@ def get_rate_unit(unitstr:str, target_unit:str='bps') -> float:
         return 1
 
     ru = interpret_rate(unitstr[-3:])
-    mtp = multipliers[unitstr[0]] if len(unitstr)>3 else 1
+    mtp = multipliers[unitstr[-4]] if len(unitstr)>3 else 1
     orig_unit = ru*mtp
 
     ru = interpret_rate(target_unit[-3:])
-    mtp = multipliers[target_unit[0]] if len(target_unit)>3 else 1
+    mtp = multipliers[target_unit[-4]] if len(target_unit)>3 else 1
     trg = ru*mtp
     
     return orig_unit/trg
@@ -313,6 +392,9 @@ def parse_num_unit_rate(numstr:str, target_unit:str='bps') -> int:
     
     if is_number(numstr):
         return float(numstr)
+
+    if numstr is None:
+        return None
 
     if target_unit is None:
         raise ValueError(f"No target unit is specified but the number string \"{numstr}\" is not a number")
@@ -397,7 +479,7 @@ def decide_multiplier(x:float)->tuple:
     return x, ''
 
 
-def decide_min_multiplier(x:Iterable)->str:
+def decide_min_multiplier(x:Iterable, unit:str=None)->str:
     '''
     Determine the minimum multiplier among a list of values
     Example:
@@ -409,6 +491,8 @@ def decide_min_multiplier(x:Iterable)->str:
     Input:
     -------
     x : [Iterable] an interable where all elements are numbers
+    unit : [str] the unit where the entries of x are written in.
+           If unit is not None, then the output minimum multiplier will return the multiplier with respect to the unit without original multiplier
 
     Output:
     -------
@@ -420,6 +504,15 @@ def decide_min_multiplier(x:Iterable)->str:
     for elem in x:
         if elem is None:
             continue
+        if unit is not None:
+            orig_mul, orig_unit = split_multiplier_unit(unit)
+            if is_time_unit(unit):
+                elem = parse_num_unit_time(f"{elem}{unit}", target_unit=orig_unit)
+            if is_data_unit(unit):
+                elem = parse_num_unit_data(f"{elem}{unit}", target_unit=orig_unit)
+            if is_rate_unit(unit):
+                elem = parse_num_unit_rate(f"{elem}{unit}", target_unit=orig_unit)
+
         new_num, mul = decide_multiplier(elem)
         if multipliers[mul] < multipliers[min_mul]:
             min_mul = mul
