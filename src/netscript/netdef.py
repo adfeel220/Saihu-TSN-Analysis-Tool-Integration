@@ -195,26 +195,28 @@ class PhysicalNet:
 
             fl_attrib = copy.deepcopy(fl.attrib)
 
-            for path_idx, fl_path in enumerate(fl.findall(keysInWopanetXML["flow_path"])):
+            paths = fl.findall(keysInWopanetXML["flow_path"])
+            for path_idx, fl_path in enumerate(paths):
                 path_name = fl_path.attrib.pop("name", f"p{path_idx}")
                 path_attrib = copy.deepcopy(fl_path.attrib)
                 
                 # fl_name = f"{fl_name}_{path_name}"
-                if fl_name in self.flows:
-                    continue
+                fl_key = fl_name
+                if len(paths)>1:
+                    fl_key = f"{fl_name}_{path_name}"
 
-                self.flows[fl_name] = dict()
-                self.flows[fl_name]["path"] = list()
-                self.flows[fl_name]["attrib"] = dict(**fl_attrib, **path_attrib)
+                self.flows[fl_key] = dict()
+                self.flows[fl_key]["path"] = list()
+                self.flows[fl_key]["attrib"] = dict(**fl_attrib, **path_attrib)
                 prev_node = source
                 for step in fl_path.findall(keysInWopanetXML["flow_path_step"]):
                     try:
                         dest = step.attrib.pop(keysInWopanetXML["flow_path_step_name"])
                     except KeyError as e:
-                        raise AttributeError("No attribute \"%s\" in flow %s, path %s".format(keysInWopanetXML["flow_path_step_name"], fl_name, path_name)) from e
+                        raise AttributeError("No attribute \"%s\" in flow %s, path %s".format(keysInWopanetXML["flow_path_step_name"], fl_key, path_name)) from e
 
                     path_step = {"node": prev_node, "port": self.__get_link_port(prev_node, dest)}
-                    self.flows[fl_name]["path"].append(path_step)
+                    self.flows[fl_key]["path"].append(path_step)
                     
                     prev_node = dest
 
@@ -311,16 +313,17 @@ class OutputPortNet:
         }
     }
 
+    base_unit = {
+        "time": "s",
+        "data": "b",
+        "rate": "bps"
+    }
+
     def __init__(self, ifile:str=None, network_def:dict=None):
         self.network_info  = dict() # general network information
         self.adjacency_mat = None   # adjacency matrix
         self.servers = list()
         self.flows = list()
-        self.units = {
-            'time': None,
-            'data': None,
-            'rate': None
-        }
 
         if network_def is not None:
             self.parse(network_def)
@@ -380,10 +383,10 @@ class OutputPortNet:
         ## Load network information
         # A network information must at least have "name"
         self.network_info = network_def["network"]
-        self.units = {
-            "time": network_def["network"].get("time_unit", self.units["time"]),
-            "data": network_def["network"].get("data_unit", self.units["data"]),
-            "rate": network_def["network"].get("rate_unit", self.units["rate"])
+        default_units = {
+            "time": network_def["network"].get("time_unit", None),
+            "data": network_def["network"].get("data_unit", None),
+            "rate": network_def["network"].get("rate_unit", None)
         }
 
         # Get server name mapping
@@ -427,9 +430,9 @@ class OutputPortNet:
             arrival_curve = fl["arrival_curve"]
             # Get local unit
             unit = {
-                "time": fl.pop("time_unit", self.units["time"]),
-                "data": fl.pop("data_unit", self.units["data"]),
-                "rate": fl.pop("rate_unit", self.units["rate"])
+                "time": fl.pop("time_unit", default_units["time"]),
+                "data": fl.pop("data_unit", default_units["data"]),
+                "rate": fl.pop("rate_unit", default_units["rate"])
             }
             # Convert arrival curve to the default unit
             arrival_curve["bursts"] = try_raise(f"Parsing flows.arrival_curve.bursts of \"{flow_name}\"", arrival_curve["bursts"] , self._convert_unit, arrival_curve["bursts"], unit["data"], "data")
@@ -476,9 +479,9 @@ class OutputPortNet:
             #################
             # Get local unit
             unit = {
-                "time": ser.pop("time_unit", self.units["time"]),
-                "data": ser.pop("data_unit", self.units["data"]),
-                "rate": ser.pop("rate_unit", self.units["rate"])
+                "time": ser.pop("time_unit", default_units["time"]),
+                "data": ser.pop("data_unit", default_units["data"]),
+                "rate": ser.pop("rate_unit", default_units["rate"])
             }
             
             # assertion of arrival curve definition
@@ -561,7 +564,7 @@ class OutputPortNet:
                             raise AttributeError("Missing mandatory field in \"{fields}\" of data {dt} ".format(fields="->".join([*subfields, field]), dt=data[field])) from e
                             
                 
-    def _convert_unit(self, data:Union[float,Iterable], written_unit:str, unit_type:str):
+    def _convert_unit(self, data:Union[float,Iterable], written_unit:str, unit_type:str) -> Union[float,list]:
         '''
         Convert the data written in another unit into default unit
 
@@ -569,7 +572,13 @@ class OutputPortNet:
         ----------
         data : [float | Iterable] the data, or the iterable of data to be converted
         writte_unit : [str] the unit that the data is written in
-        
+        unit_type : [str] the type of unit to be converted. Can be either "time"/"data"/"rate"
+
+        Output:
+        ----------
+        converted_values : [float | list] the value(s) of the converted data,
+                if the data is a single value, then this value is a sinagle value;
+                if the data is a iterable, then this value is a list containing all converted values
         '''
         if unit_type.lower() == "time":
             parse_func = parse_num_unit_time
@@ -584,14 +593,14 @@ class OutputPortNet:
         if is_number(data):
             data_with_unit = "{num}{unit}".format(num=data, unit=written_unit)
             try:
-                return parse_func(data_with_unit, self.units[unit_type.lower()])
+                return parse_func(data_with_unit, self.base_unit[unit_type.lower()])
             except ValueError as e:
                 raise ValueError(f"Error trying to convert with unit \"{written_unit}\"") from e
 
         # already with unit : use the unit written in the string
         elif type(data) is str:
             try:
-                return parse_func(data, self.units[unit_type.lower()])
+                return parse_func(data, self.base_unit[unit_type.lower()])
             except ValueError as e:
                 raise ValueError(f"Error trying to convert \"{data}\"") from e
 
@@ -604,7 +613,7 @@ class OutputPortNet:
                 if is_number(d):
                     data_with_unit = "{num}{unit}".format(num=d, unit=written_unit)
                     try:
-                        output.append(parse_func(data_with_unit, self.units[unit_type.lower()]))
+                        output.append(parse_func(data_with_unit, self.base_unit[unit_type.lower()]))
                     except ValueError as e:
                         raise ValueError(f"Error trying to convert with unit \"{written_unit}\"") from e
 
@@ -612,7 +621,7 @@ class OutputPortNet:
                 # already with unit : use the unit written in the string
                 elif type(d) is str:
                     try:
-                        output.append(parse_func(d, self.units[unit_type.lower()]))
+                        output.append(parse_func(d, self.base_unit[unit_type.lower()]))
                     except ValueError as e:
                         raise ValueError(f"Error trying to convert \"{d}\"") from e
 
@@ -622,7 +631,21 @@ class OutputPortNet:
 
     def _assert_curve(self, curve:dict, name:int) -> None:
         '''
-        assert the properties of a curve
+        Assert the properties of an arrival/service curve
+
+        1. Make sure there's at least 1 segment defined in the curve
+        2. Align latencies/bursts with rates when they have different lengths
+        3. Remove redundent segments and rewrite the values in-order
+            For arrival curves, bursts are increasing and rates are decreasing
+            For service curves, latencies are increasing and rates are increasing
+
+        The modifications are applied directly on the curves
+
+        Inputs:
+        -------------
+        curve : [dict] contains either "latencies" and "rates" as a service curve, 
+                or "bursts" and "rates" as an arrival curve
+        name  : [str] name of a flow/server for more precise error printing
         '''
         if "latencies" in curve:
             # the curve is a service curve, extract latencies
@@ -710,7 +733,7 @@ class OutputPortNet:
     
     def get_gif(self)->nx.DiGraph:
         '''
-        Return a Graph induced by Flows
+        Return a Graph induced by Flows as a networkx directed graph
         '''
         G = nx.DiGraph()
         for fl in self.flows:
@@ -752,8 +775,3 @@ class OutputPortNet:
         utility = dict(zip(ser_names, agg_arr_rate/ser_rates))
         
         return utility
-
-if __name__ == "__main__":
-    opnet = OutputPortNet(ifile="./demo_net.json")
-    print(opnet)
-    

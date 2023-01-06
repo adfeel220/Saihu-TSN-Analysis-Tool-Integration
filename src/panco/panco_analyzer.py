@@ -94,7 +94,7 @@ class panco_analyzer():
 
         # Load general network information
         self.network_info  = deepcopy(output_port_net.network_info)
-        self.units = deepcopy(output_port_net.units)
+        self.units = deepcopy(output_port_net.base_unit)
         self.adjacency_mat = output_port_net.adjacency_mat.copy()
         self.flows_info = deepcopy(output_port_net.flows)
         self.servers_info = deepcopy(output_port_net.servers)

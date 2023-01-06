@@ -18,6 +18,23 @@ from unit_util import *
 def check_file_ext(fpath:str, ext:str) -> str:
     '''
     Check the file name extension (ending) to make sure it's correct
+    If the original file name doesn't contain the correct extension name, it will append one to it
+
+    Inputs:
+    -------------
+    fpath : [str] the original file path
+    ext   : [str] the original extension, with or without '.'
+
+    Output:
+    -------------
+    out_fpath : [str] the new file path that contains file extension
+
+    Example:
+    >>> fpath = "test"
+    >>> check_file_ext(fpath, "txt")
+    test.txt
+    >>> check_file_ext("test.txt", "txt")
+    test.txt
     '''
     # ignore empty input
     if type(fpath) is not str:
@@ -34,20 +51,32 @@ def check_file_ext(fpath:str, ext:str) -> str:
     return fpath
 
 
-def add_text_in_ext(fpath:str, *text:str, sep:str="_") -> str:
+def add_text_in_ext(fname:str, *text:str, sep:str="_") -> str:
     '''
     Add a text in file path while preserving extension
+
+    Inputs:
+    -------------
+    fname : [str] the original file name
+    text  : [str] new texts you want to add
+    sep   : [str] the separator between added texts
+
+    Output:
+    --------------
+    new_fname : [str] the new file name with added texts
 
     Example:
     >>> fname = "test.txt"
     >>> add_text_in_ext(fname, "new", "v")
     test_new_v.txt
+    >>> add_text_in_ext(fname, "new", "v", sep='-')
+    test-new-v.txt
     '''
     # Check extension name
     try:
-        name, ext = fpath.rsplit(".", 1)
+        name, ext = fname.rsplit(".", 1)
     except ValueError:
-        name = fpath
+        name = fname
         ext  = ""
     
     # Add text to path
@@ -60,16 +89,6 @@ def add_text_in_ext(fpath:str, *text:str, sep:str="_") -> str:
         return name
         
 
-
-
-def get_portlist_index(portlist:list, physical_name:str, port:str)->int:
-    '''
-    return the index in a portlist
-    '''
-    for i, port_info in enumerate(portlist):
-        if port_info["physical_node"] == physical_name and port_info["port"] == port:
-            return i
-    return None
 
 class NetworkScriptHandler:
     '''
@@ -246,7 +265,7 @@ class NetworkScriptHandler:
             # Get flow path
             path = []
             for step in fl_data["path"]:
-                port_idx = get_portlist_index(port_list, step["node"], step["port"])
+                port_idx = self._get_portlist_index(port_list, step["node"], step["port"])
                 if port_idx is not None:
                     path.append(servers[port_idx]["name"])
 
@@ -499,6 +518,12 @@ class NetworkScriptHandler:
     def get_network_info(self, filename:str, target_attr:str, default=None):
         '''
         Get a certain attribute from a file, return None if not found
+
+        Inputs:
+        -------------
+        filename : [str] the name of the file to be retrieved
+        target_attr : [str] the name of the target attribute
+        default  : [Any] the default value to return if the target attribute is not in the file
         '''
         if filename.endswith("xml"):
             # Load the information
@@ -522,6 +547,14 @@ class NetworkScriptHandler:
     def get_network_utility(self, filename:str) -> dict:
         '''
         Obtain network load (utility) for each server
+
+        Input:
+        ----------
+        filename : [str] the file name of the network to determine utility
+
+        Output:
+        ----------
+        utilities : [dict] utilities of all servers, key=server name ; value=utility
         '''
         if filename.endswith(".xml"):
             network_def = self.phynet_to_opnet_json(filename)
@@ -533,3 +566,13 @@ class NetworkScriptHandler:
 
         return opnet.get_utility()
         
+
+
+    def _get_portlist_index(self, portlist:list, physical_name:str, port:str)->int:
+        '''
+        return the index in a portlist, used when parsing physical network
+        '''
+        for i, port_info in enumerate(portlist):
+            if port_info["physical_node"] == physical_name and port_info["port"] == port:
+                return i
+        return None

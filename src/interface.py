@@ -57,15 +57,17 @@ class TSN_Analyzer():
 
     Methods:
     --------------
-    set_shaping_mode : Select whether to use shaper. Can be "AUTO", "ON", or "OFF"
-    convert_netfile  : Convert a netfile into both physical and output-port network from either format
-    analyze_all      : Analyze the network with all tools available
-    analyze_xtfa     : Analyze the network with xTFA
-    analyze_linear   : Analyze the network with linear TFA solver
-    analyze_panco    : Analyze the network with panco FIFO analyzer
-    analyze_dnc      : Analyze the network with DNC
-    write_result     : Write the output report
-    clear            : Reset analyzer
+    set_shaping_mode  : Select whether to use shaper. Can be "AUTO", "ON", or "OFF"
+    convert_netfile   : Convert a netfile into both physical and output-port network from either format
+    analyze_all       : Analyze the network with all tools available
+    analyze_xtfa      : Analyze the network with xTFA
+    analyze_linear    : Analyze the network with linear TFA solver
+    analyze_panco     : Analyze the network with panco FIFO analyzer
+    analyze_dnc       : Analyze the network with DNC
+    export            : Write JSON and MD reports
+    write_result_json : Write result into a JSON
+    write_report_md   : Write human readable report in Markdown
+    clear             : Reset analyzer inner parameters/buffer
     '''
     netfile        : str                    # Path to a network file to be analyzed
     script_handler : NetworkScriptHandler   # Script handler to manipulating network definition scripts
@@ -134,16 +136,25 @@ class TSN_Analyzer():
             print(f"No such shaper enforcement {enforce}, must in {list(FORCE_SHAPER)} ignore")
             self.output_shaping = FORCE_SHAPER.AUTO
 
-    def export(self, default_name:str=None, json_output:str=None, report_file:str=None, clear:bool=True)->None:
+    def export(self, default_name:str="result", json_output:str=None, report_file:str=None, clear:bool=True)->None:
         '''
         Write the json output as well as the markdown report
+
+        Inputs:
+        ------------
+        default_name : [str] Default naming of output files. 
+                       JSON output will have name [default_name]_data.json if json_output is not specified
+                       Markdown output will have name [default_name]_report.md if report_file is not specified
+        json_output : [str] File name for json output file
+        report_file : [str] File name for markdown report file
+        clear : [bool] Whether to clear the buffer after writing results. Default is True
         '''
-        if default_name is None:
-            default_name = "result"
         if json_output is None:
             json_output = add_text_in_ext(default_name, "data")
+        json_output = check_file_ext(json_output, "json")
         if report_file is None:
             report_file = add_text_in_ext(default_name, "report")
+        report_file = check_file_ext(report_file, "md")
 
         self.write_result_json(json_output, clear=False)
         self.write_report_md(report_file, clear=False)
@@ -187,14 +198,22 @@ class TSN_Analyzer():
             output_index += 1
 
             # Retrieve the smallest unit among all results
-            units = self.get_smallest_unit(results)
+            self._units = self._get_smallest_unit(results)
+            timeunit = unit_util.split_multiplier_unit(self._units["time"])[1]
+            self._units = {
+                "flow_delay": "{m}{u}".format(m=self.flow_delay_mul,u=timeunit),
+                "server_delay": "{m}{u}".format(m=self.serv_delay_mul, u=timeunit)
+            }
+            if timeunit == '':
+                self._units["flow_delay"] = ''
+                self._units["server_delay"] = ''
             
             result_json = dict()
             result_json["name"] = net_name
             result_json["flow_e2e_delay"] = dict()
             result_json["server_delay"] = dict()
             result_json["execution_time"] = dict()
-            result_json["units"] = {**units, "exectution_time": self.exec_time_mul+'s'}
+            result_json["units"] = {**self._units, "exectution_time": self.exec_time_mul+'s'}
 
             for res in results:
 
@@ -206,7 +225,7 @@ class TSN_Analyzer():
                         if fl_name not in result_json["flow_e2e_delay"]:
                             result_json["flow_e2e_delay"][fl_name] = dict()
 
-                        result_json["flow_e2e_delay"][fl_name][tool_method_name] = delay * unit_util.get_time_unit(res.units["time"], units["time"])
+                        result_json["flow_e2e_delay"][fl_name][tool_method_name] = delay * unit_util.get_time_unit(res.time_unit, self._units["flow_delay"])
 
                 # server delay
                 if res.server_delays is not None:
@@ -214,7 +233,7 @@ class TSN_Analyzer():
                         if s_name not in result_json["server_delay"]:
                             result_json["server_delay"][s_name] = dict()
 
-                        result_json["server_delay"][s_name][tool_method_name] = delay * unit_util.get_time_unit(res.units["time"], units["time"])
+                        result_json["server_delay"][s_name][tool_method_name] = delay * unit_util.get_time_unit(res.time_unit, self._units["server_delay"])
 
                 # execution time
                 if res.exec_time is not None:
@@ -264,7 +283,7 @@ class TSN_Analyzer():
             res_sorted = dict(sorted(res_sorted.items()))
             res_sorted = dict(zip(["{t}-{m}".format(t=r.tool, m=r.method) for r in res_sorted.values()], res_sorted.values()))
 
-            self._units = self.get_smallest_unit(res)
+            self._units = self._get_smallest_unit(res)
             self._units = {
                 "flow_delay": "{m}{u}".format(m=self.flow_delay_mul,u=unit_util.split_multiplier_unit(self._units["time"])[1]),
                 "server_delay": "{m}{u}".format(m=self.serv_delay_mul, u=unit_util.split_multiplier_unit(self._units["time"])[1])
@@ -312,14 +331,20 @@ class TSN_Analyzer():
             mdFile.new_paragraph(f"This report contains {len(res)} analysis over network **\"{net_name}\"**.\n")
             mdFile.write(f"There are **{res[0].num_servers}** servers and **{res[0].num_flows}** flows in the system.")
             # topology
-            fig, ax = plt.subplots()
-            nx.draw(res[0].graph, with_labels=True)
-            graph_file_path = os.path.join(outpath, f"{net_name}_topo.png")
-            fig.savefig(graph_file_path, dpi=300, bbox_inches='tight')
-            plt.close(fig)
+            graph = None
+            for r in res:
+                if r.graph is not None:
+                    graph = r.graph
+                    break
+            if graph is not None:
+                fig, ax = plt.subplots()
+                nx.draw(graph, with_labels=True)
+                graph_file_path = os.path.join(outpath, f"{net_name}_topo.png")
+                fig.savefig(graph_file_path, dpi=300, bbox_inches='tight')
+                plt.close(fig)
 
-            mdFile.new_header(level=2, title="Network Topology")
-            mdFile.new_line(mdFile.new_reference_image(text="Network graph", path=f"./{net_name}_topo.png", reference_tag='topo'))
+                mdFile.new_header(level=2, title="Network Topology")
+                mdFile.new_line(mdFile.new_reference_image(text="Network graph", path=f"./{net_name}_topo.png", reference_tag='topo'))
 
             # Flow path
             self._build_flow_paths(mdFile, res_sorted)
@@ -738,7 +763,7 @@ class TSN_Analyzer():
             result["tool"] = "DNC"
             result["method"] = method
             server_names = res_per_method[0]["server_names"]
-            result["units"] = self.script_handler.op_net.units.copy()
+            result["units"] = self.script_handler.op_net.base_unit.copy()
 
             # determine delays
             result["server_delays"] = res_per_method[0]["server_delays"]
@@ -1190,7 +1215,8 @@ class TSN_Analyzer():
         # fill in the contents
         for mid, res_same_method in enumerate(result_method_dict.values()):
             for res in res_same_method:
-                table_perv[mid+1, tool_mapping[res.tool]+1] = "{:.3f}".format(res.exec_time / unit_util.multipliers[self.exec_time_mul])
+                if res.exec_time is not None:
+                    table_perv[mid+1, tool_mapping[res.tool]+1] = "{:.3f}".format(res.exec_time / unit_util.multipliers[self.exec_time_mul])
 
         # write into MD
         table_perv = table_perv.flatten().tolist()
@@ -1258,7 +1284,7 @@ class TSN_Analyzer():
         return y
 
 
-    def get_smallest_unit(self, results:list=None) -> dict:
+    def _get_smallest_unit(self, results:list=None) -> dict:
         '''
         Obtain the smallest units among the results
         '''

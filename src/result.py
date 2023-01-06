@@ -14,7 +14,6 @@ class TSN_result():
     server_backlogs : dict          # Delays stored according to server names, unit in bits. e.g. {'s_1': 1.0, 's_2': 2.0}
     max_backlog     : int           # Maximum of all server backlogs
     flow_paths      : dict          # Path of each flow as a list of servers according to flow names. e.g. {'fl_1': ['s_1', 's_2']}
-    flow_cmu_delays : dict          # Cumulative delays by each flow. e.g. {'fl_1': {'s_1': 1.0, 's_2': 3.0}}
     flow_delays     : dict          # End-to-end delays of each flow. e.g. {'fl_1': 4.0, 'fl_2': 7.0}
     exec_time       : float         # Execution time of the analysis, unit in seconds
     units           : dict          # Units used in the values, can take 'time', 'data' and 'rate'. e.g. {'time': 'us', 'data': 'MB', 'rate': 'Gbps}
@@ -27,7 +26,7 @@ class TSN_result():
     def __init__(self, **kargs) -> None:
         self._name  = kargs.get("name", "NONAME")
         self._tool  = kargs.get("tool", "UNKNOWN_TOOL")
-        self._graph = kargs.get("graph", nx.DiGraph())
+        self._graph = kargs.get("graph", None)
         self._method = kargs.get("method", "UNKNOWN_METHOD")
 
         self._server_delays = kargs.get("server_delays", None)
@@ -40,9 +39,6 @@ class TSN_result():
 
         self._units = {"time": None, "data": None, "rate": None}
         self._units.update(kargs.get("units", dict()))
-        # self._units.setdefault("time", None)
-        # self._units.setdefault("data", None)
-        # self._units.setdefault("rate", None)
 
         self._network_source = kargs.get("network_source", None)
         self._converted_from  = kargs.get("converted_from" , "")
@@ -120,10 +116,6 @@ class TSN_result():
     @property
     def flow_paths(self)->dict:
         return self._flow_paths
-
-    @property
-    def flow_cmu_delays(self)->dict:
-        return self._flow_cmu_delays
 
     @property
     def flow_delays(self)->dict:

@@ -1,116 +1,74 @@
 {
-    "network": {
-        "name": "demo"
+    "network":
+    {
+        "name": "demo",
+        "packetizer": false,
+        "multiplexing": "FIFO",
+        "analysis_option": ["IS"],
+        "time_unit": "s",
+        "data_unit": "b",
+        "rate_unit": "bps"
     },
-    
-    "adjacency_matrix":
-    [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ],
 
     "flows":
     [
         {
-            "name": "fl-0",
-            "path": [2,4,5,6,7,8],
+            "name": "f0",
+            "path": ["s0-o0", "s1-o0"],
             "arrival_curve": {
-                "bursts": [0.01e6],
-                "rates": [0.1e6]
+                "bursts": [1, "2kB"],
+                "rates": [1, 0.5]
             },
-            "packet_length": 0
+            "min_packet_length": 1,
+            "max_packet_length": 1
         },
         {
-            "name": "fl-1",
-            "path": [1,3,4,5,6],
+            "name": "f1",
+            "path": ["s0-o0", "s1-o1"],
             "arrival_curve": {
-                "bursts": [0.01e6],
-                "rates": [0.1e6]
+                "bursts": [1, 10],
+                "rates": [1, 0.5]
             },
-            "packet_length": 0
+            "min_packet_length": 1,
+            "max_packet_length": 1
+        },
+        {
+            "name": "f2",
+            "path": ["s1-o0"],
+            "arrival_curve": {
+                "bursts": [1, 10],
+                "rates": [1, 0.7]
+            },
+            "min_packet_length": 1,
+            "max_packet_length": 1
         }
     ],
 
     "servers":
     [
         {
-            "name": "sw-0",
+            "name": "s0-o0",
             "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
+                "latencies": [1, 2],
+                "rates": [4,10]
             },
-            "capacity": 100e6
+            "capacity": 10
         },
         {
-            "name": "sw-1",
+            "name": "s1-o0",
             "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
+                "latencies": [1,2],
+                "rates": [4,10]
             },
-            "capacity": 100e6
+            "capacity": 10
         },
         {
-            "name": "sw-2",
+            "name": "s1-o1",
             "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
+                "latencies": [1],
+                "rates": [4]
             },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-3",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-4",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-5",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-6",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-7",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
-        },
-        {
-            "name": "sw-8",
-            "service_curve": {
-                "latencies": [1e-2],
-                "rates": [10e6]
-            },
-            "capacity": 100e6
+            "capacity": 10
         }
     ]
 }

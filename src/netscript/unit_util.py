@@ -48,7 +48,7 @@ data_units = {
 
 def is_number(num_str:str) -> bool:
     '''
-    Check if a string if a number
+    Check if a string is a number
     '''
     if num_str is None:
         return False
@@ -89,7 +89,24 @@ def is_rate_unit(unitstr:str) -> bool:
 
 def split_multiplier_unit(unitstr:str) -> tuple:
     '''
-    split the multiplier and unit from the combination
+    split the multiplier and unit from the string of combination
+
+    Input:
+    -----------
+    unitstr : [str] the combination of a multiplier and a unit. For example "ms", "b", "Gbps"
+
+    Output:
+    -----------
+    multiplier : [str] Multiplier without unit
+    unit       : [str] Unit without multiplier
+
+    Example:
+    >>> split_multiplier_unit("ms")
+    ('m', 's')
+    >>> split_multiplier_unit("bps")
+    ('', 'bps')
+    >>> split_multiplier_unit("s")
+    ('', 's')
     '''
     # time/data unit without multiplier
     if len(unitstr)==1:
@@ -121,6 +138,12 @@ def split_num_unit(numstr:str, default_unit:str='') -> tuple:
     -----------
     num: [float] the number in the string
     unit: [str] the unit attached to the number string
+
+    Example:
+    >>> split_num_unit("3ms")
+    (3, 'ms')
+    >>> split_num_unit("2.5bps")
+    (2.5, 'bps')
     '''
     if is_number(numstr):
         return float(numstr), default_unit
@@ -136,6 +159,8 @@ def interpret_rate(unit:str) -> float:
     '''
     Check if it's a valid rate unit derived from time and data units.
     It must be 3 characters long as "{data unit}p{time unit}". For example "bps" stands for "bits-per-second"
+
+    If not problem with the format, returns the value with respect to bps
     '''
     if len(unit) != 3:
         raise ValueError(f"\"{unit}\" is not a valid rate unit, the format must be 3 parts. 1st data unit must be either {list(data_units.keys())}; "
@@ -163,6 +188,21 @@ def interpret_rate(unit:str) -> float:
 def get_time_unit(unitstr:str, target_unit:str='s') -> float:
     '''
     Convert the time unit to the target unit
+
+    Input:
+    -----------
+    unitstr : [str] the time unit to be determined
+    target_unit : [str] the target unit to be expressed in. Default is 's'
+
+    Output:
+    -----------
+    unit_value : [float] the value of how original unitstr is written in target unit
+
+    Example:
+    >>> get_time_unit("s", 'ms')
+    1000
+    >>> get_time_unit('h', 's')
+    3600
     '''
     if unitstr is None or target_unit is None:
         return 1
@@ -256,6 +296,21 @@ def parse_num_unit_time(numstr:str, target_unit:str='s') -> float:
 def get_data_unit(unitstr:str, target_unit:str='b') -> float:
     '''
     Convert the data unit to the target unit
+
+    Input:
+    -----------
+    unitstr : [str] the data unit to be determined
+    target_unit : [str] the target unit to be expressed in. Default is 'b' (bit)
+
+    Output:
+    -----------
+    unit_value : [float] the value of how original unitstr is written in target unit
+
+    Example:
+    >>> get_data_unit("Mb", 'b')
+    1000000
+    >>> get_data_unit('kB', 'b')
+    8000
     '''
     if unitstr is None or target_unit is None:
         return 1
@@ -353,6 +408,19 @@ def parse_num_unit_data(numstr:str, target_unit:str='b') -> float:
 def get_rate_unit(unitstr:str, target_unit:str='bps') -> float:
     '''
     Convert the rate unit to the target unit
+
+    Input:
+    -----------
+    unitstr : [str] the rate unit to be determined
+    target_unit : [str] the target unit to be expressed in. Default is 'bps'
+
+    Output:
+    -----------
+    unit_value : [float] the value of how original unitstr is written in target unit
+
+    Example:
+    >>> get_rate_unit("Mbps", 'bps')
+    1000000
     '''
     if unitstr is None or target_unit is None:
         return 1
