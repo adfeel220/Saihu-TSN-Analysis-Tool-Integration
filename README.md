@@ -1,8 +1,11 @@
 Saihu: A Common Interface for Worst-Case Delay Analysis of Time-Sensitive Networks
 =======================
 Author: Chun-Tso Tsai
+
 Advisors: Seyed Mohammadhossein Tabatabaee, Stéphan Plassart, Jean-Yves Le Boudec
-Date: 2023-01-05
+
+Date: 2023-01-06
+
 Institute: Computer Communications and Applications Laboratory 2 (LCA2), École Polytechnique Fédérale de Lausane (EPFL)
 
 Table of Contents
@@ -350,14 +353,18 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     | **ELP** |   |   | V |   |
     | **PMOO** | V |
     | **TMA** | V |
+
     Note: TMA stands for Tandem Matching Analysis
+    
 - Constraints
     | Spec\Tool | DNC | xTFA | Panco | Linear TFA |
     | :--: | :-: | :--: | :---: | :----: |
     | **Manual Tune Shaping*** |  | V | V | V |
     | **Cyclic Dependent Network***   |  | V | V | V |
 
-    Note: 1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 2. `Panco-ELP` doesn't allow cyclic dependent network.
+    Note: 
+    1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 
+    2. `Panco-ELP` doesn't allow cyclic dependent network.
 
 ### Public Methods
 To use our general interface, you need to first import class `TSN_Analyzer` from the file `src/interface.py`.
