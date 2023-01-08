@@ -4,7 +4,7 @@ Author: Chun-Tso Tsai
 
 Advisors: Seyed Mohammadhossein Tabatabaee, Stéphan Plassart, Jean-Yves Le Boudec
 
-Date: 2023-01-06
+Date: 2023-01-08
 
 Institute: Computer Communications and Applications Laboratory 2 (LCA2), École Polytechnique Fédérale de Lausane (EPFL)
 
@@ -27,6 +27,8 @@ Table of Contents
         * [Tool Specification](#tool-specification)
         * [Public Methods](#public-methods)
     * [Network Generation](#network-generation)
+        * [Certain Network Type](#certain-network-type)
+        * [Random Network with Fixed Topology](#random-network-with-fixed-topology)
 * [Example](#example)
     * [Specific Tool](#specific-tool)
     * [Selecting Shaper](#selecting-shaper)
@@ -495,9 +497,10 @@ analyzer.clear()
 ```
 
 ## Network Generation
+### Certain Network Type
 Use functions from `src/netscript/net_gen.py`, there are 3 types of network that can be generated automatically. All servers and flows would have the same arrival curve, service curve, and shaper. Networks will be generated into output-port network in `.json` format.
 - `generate_interleave_tandem()`
-    The network with a chain topology. i.e. **s0** -> **s1** -> ... -> **sn-1**. 1 flow goes through all servers, and $n-1$ flows go from $k \rightarrow k+1$ for $k \in [0, n-2]$
+    The network with a interleaved chain topology. i.e. **s0** -> **s1** -> ... -> **sn-1**. 1 flow goes through all servers, and $n-1$ flows go from $k \rightarrow k+1$ for $k \in [0, n-2]$
 - `generate_ring()`
     The network with a ring topology. i.e. **s0** -> **s1** -> ... -> **sn-1** -> **s0**. $n$ flows go from $k \rightarrow k-1\ mod\ n$
 - `generate_mesh()`
@@ -522,6 +525,74 @@ All 3 methods take the same parameters:
 - `ser_rate`: Service rate of each server.
 - `capacity`: The transmission capacity of each server.
 - `dir`: (Optional) The output file to store the generated network. Default is `None`, which is not writing the network to file, but return a dictionary of all information instead (the dictionary as loaded from a `.json` file.)
+
+### Random Network with Fixed Topology
+One can also generate a random network from a fixed topology.
+The user can choose how many flows are going into this network and the arrival/service curve specifications, this function automatically generates a corresponding output-port network (JSON) to represent it.
+
+Say one would like to randomly generate a network with this following switch inter-connection (source: [Deficit Round-Robin: A Second Network Calculus Analysis](https://ieeexplore.ieee.org/document/9470448)):
+<p style="text-align:center;"><img src="images/complex_net.png" alt="industrial-network" width="400"/></p>
+Then one can generate a network as follows:
+```
+connections = {
+    "S1": [      "S2", "S3",                         "S8"],
+    "S2": ["S1",             "S4",                   "S8"],
+    "S3": ["S1",             "S4", "S5",       "S7", "S8"],
+    "S4": [      "S2", "S3",             "S6", "S7", "S8"],
+    "S5": [            "S3",             "S6", "S7"],
+    "S6": [                  "S4", "S5",       "S7"],
+    "S7": [            "S3", "S4", "S5", "S6"],
+    "S8": ["S1", "S2", "S3", "S4"]
+}
+generate_fix_topology_network(num_flows=30, connections=connections,
+                              burst="10B", arrival_rate=("200bps", "20kbps"), max_packet_length="6kB",
+                              latency=("2us", "200ms"), service_rate=("1Mbps", "50Mbps"), capacity="100Mbps",
+                              dir="rand_net.json",
+                              link_prob=0.9)
+```
+The above code generates 30 flows within the given topology, and dump the output port network as `rand_net.json`. Note that the flow/server parameters can be decided randomly or deterministically. The above example shows that for `burst` it's a constant `"10B"` (10 Bytes) whereas other parameters are decided uniform-randomly among a (min, max) value pair.
+
+**Parameters**
+- `num_flows`: number of flows to be generated in the network
+- `connections`: possible connections between switches. key=name of switch; value=list of switch's name that "key" can connect to. e.g.
+    ```
+    connections = {
+        "s1": ["s2", "s3"],
+        "s2": ["s3"],
+        "s3": ["s1", "s2"]
+    }
+    ```
+    this means 's1' can go to 's2' & 's3'; 's2' can go to 's3'; and 's3' can go to 's1' & 's2'
+- `burst`: burst of arrival curve, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"2.5kB"`
+    3. `Iterable`: length 2 indicating min and max value, the burst value will be selected randomly between min & max. e.g. `("100b", "5kB")`
+- `arrival_rate`: arrival rate of arrival curve, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"2.5Mbps"`
+    3. `Iterable`: length 2 indicating min and max value, the rate value will be selected randomly between min & max. e.g. `("1kbps", "50Mbps")`
+- `max_packet_length`: maximum packet length of a flow, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"10kB"`
+- `latency`: latency of service curve, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"2.5ms"`
+    3. `Iterable`: length 2 indicating min and max value, the latency value will be selected randomly between min & max. e.g. `("10us", "20ms")`
+- `service_rate`: service rate of service curve, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"2.5Mbps"`
+    3. `Iterable`: length 2 indicating min and max value, the burst value will be selected randomly between min & max. e.g. `("1kbps", "50Mbps")`
+- `capacity`: capacity of a link, can be 
+    1. `float`: a direct assignment. e.g. `2.0`
+    2. `str`: a constant assignment with unit. e.g. `"1Gbps"`
+- `max_out_end_stations`: maximum number of end stations (sink) that can be attached to a switch. Default is `1`
+- `network_attrib`: (Optional) Additinoal network information. Default is empty
+- `server_attrib`: (Optional) Additinoal server information. Default is empty
+- `flow_attrib`: (Optional) Additinoal flow information. Default is empty
+- `dir`: (Optional) path to dump the generated file as a json output-port network. Default is `None`, where no file will be dumped
+- `link_prob`: (Optional) probability $p$ to continue finding next switch, otherwise directly go to a sink. Default is `0.9`
+- `rand_seed`: (Optional) random seed to feed to python `random` library. Default is `None` (random seed by time)
+
 
 # Example
 You may check [example.py](./example/example.py) for the simple example. Here I present the basic usage.

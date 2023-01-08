@@ -459,7 +459,7 @@ class OutputPortNet:
             # if network default is still not defined, use the minimum burst among all bursts
             default_min_pkt_len = network_def["network"].get("min_packet_length", min(arrival_curve["bursts"]))
             min_pkt_len = fl.get("min_packet_length", default_min_pkt_len)
-            min_pkt_len = try_raise(f"Parsing flows.min_packet_length of \"{flow_name}\"", max_pkt_len, self._convert_unit, min_pkt_len, unit["data"], "data")
+            min_pkt_len = try_raise(f"Parsing flows.min_packet_length of \"{flow_name}\"", min_pkt_len, self._convert_unit, min_pkt_len, unit["data"], "data")
             if min_pkt_len < 0:
                 raise ValueError(f"Minimum packet length of flow {flow_name} is negative ({min_pkt_len}), should at least >= 0.")
             fl["min_packet_length"] = min_pkt_len
@@ -588,6 +588,9 @@ class OutputPortNet:
             parse_func = parse_num_unit_rate
         else:
             raise SyntaxError(f"Unit type \"{unit_type}\" is not a valid input. Should be either \"time\"/\"data\"/\"rate\"")
+
+        if written_unit is None:
+            written_unit = ''
 
         # pure number : use the locally defined unit
         if is_number(data):

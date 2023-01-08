@@ -173,7 +173,7 @@ class TSN_Analyzer():
         output_file: [str] path of the output report
         clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
         '''
-        print("Writing result file...", end="")
+        print("Writing JSON result file...", end="")
 
         if len(self.results) == 0:
             print("No result is written to file: No results analyzed before")
@@ -259,7 +259,7 @@ class TSN_Analyzer():
         comment: [str] a comment written at the beginning of the report
         clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
         '''
-        print("Writing report...", end="")
+        print("Writing Markdown report...", end="")
 
         if len(self.results) == 0:
             print("No report generated: No results analyzed before")
@@ -735,7 +735,7 @@ class TSN_Analyzer():
         # determine if network is cyclic
         self.script_handler.load_opnet(netfile)
         if self.script_handler.is_cyclic():
-            print("Skip: network is cyclic and not allowed by DNC")
+            print("Skip: network has cyclic dependency and not allowed by DNC")
             return
         
         # use the formatted network
