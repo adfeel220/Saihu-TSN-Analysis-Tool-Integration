@@ -297,7 +297,7 @@ class TSN_Analyzer():
 
             # Create the output Markdown file to write
             mdFile = mdu(file_name=output_file, title=f"Analysis Report - \"{net_name}\"")
-            mdFile.new_paragraph("The is a automatically generated report with project `TSN Analysis Tools Intergration`\n")
+            mdFile.new_paragraph("The is a automatically generated report with `Saihu` [Github Link](https://github.com/adfeel220/TSN_Analysis_Tool_Integration)\n")
             if comment is not None:
                 mdFile.new_line("**Comment:**")
                 mdFile.new_paragraph(comment)

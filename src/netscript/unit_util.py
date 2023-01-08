@@ -65,7 +65,8 @@ def is_time_unit(unitstr:str) -> bool:
     '''
     for tu in time_units:
         if unitstr.endswith(tu):
-            return True
+            if not is_rate_unit(unitstr):  # rate unit also ends with a time unit
+                return True
     return False
 
 def is_data_unit(unitstr:str) -> bool:
@@ -86,6 +87,38 @@ def is_rate_unit(unitstr:str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def is_comparable(numstr1:str, numstr2:str) -> bool:
+    '''
+    Return True if both number strings are written in the same unit type,
+    unitless string are consider comparable with all other types.
+
+    Example
+    -----------
+    >>> is_comparable("1s", "3ms")
+    True
+    >>> is_comparable("2B", "10b")
+    True
+    >>> is_comparable("30bps", "2")
+    True
+    >>> is_comparable("20b", "10bps")
+    False
+    '''
+    if is_number(numstr1) or is_number(numstr2):
+        return True
+
+    if is_rate_unit(numstr1) and is_rate_unit(numstr2):
+        return True
+
+    if is_time_unit(numstr1) and is_time_unit(numstr2):
+        return True
+
+    if is_data_unit(numstr1) and is_data_unit(numstr2):
+        return True
+
+    return False
+        
 
 def split_multiplier_unit(unitstr:str) -> tuple:
     '''
@@ -155,6 +188,25 @@ def split_num_unit(numstr:str, default_unit:str='') -> tuple:
     return None, None
 
 
+def split_num_multiplier_unit(numstr:str) -> tuple:
+    '''
+    Split a number string into 3 parts, number/multiplier/unit
+
+    Input:
+    -----------
+    numstr : [str] number with units
+    
+    Output:
+    -----------
+    number : [float] value of number
+    multiplier : [str] multiplier, can be ''
+    unit   : [str] unit
+    '''
+    num, unit = split_num_unit(numstr)
+    multiplier, unit = split_multiplier_unit(unit)
+    return num, multiplier, unit
+
+
 def interpret_rate(unit:str) -> float:
     '''
     Check if it's a valid rate unit derived from time and data units.
@@ -183,6 +235,34 @@ def interpret_rate(unit:str) -> float:
     tu = time_units[unit[2]]
 
     return du/tu
+
+
+def parse_num_unit(numstr:str) -> float:
+    '''
+    Parse the number with unit
+
+    Input:
+    -----------
+    numstr: [str] a string potentially contains 
+
+    Output:
+    -----------
+    value : [float] the value of the string written in base unit
+    '''
+    if is_number(numstr):
+        return float(numstr)
+
+    if numstr is None:
+        return None
+
+    if is_rate_unit(numstr):
+        return parse_num_unit_rate(numstr)
+    elif is_time_unit(numstr):
+        return parse_num_unit_time(numstr)
+    elif is_data_unit(numstr):
+        return parse_num_unit_data(numstr)
+    else:
+        raise ValueError(f"Unrecognized unit type written in {numstr}")
 
 
 def get_time_unit(unitstr:str, target_unit:str='s') -> float:

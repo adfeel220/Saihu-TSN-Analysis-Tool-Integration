@@ -326,7 +326,7 @@ class NetworkScriptHandler:
         pk = network_info.pop("packetizer", False)
         if pk:
             technology.append("PK")
-        if network_info.pop("multiplexing").upper() == "FIFO":
+        if network_info.pop("multiplexing", "FIFO").upper() == "FIFO":
             technology.append("FIFO")
         technology += network_info.pop("analysis_option", [])
         network_info["technology"] = "+".join(technology)
