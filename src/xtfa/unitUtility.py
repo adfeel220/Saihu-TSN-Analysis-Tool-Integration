@@ -23,8 +23,10 @@ def readRate(s) -> float:
     if(isinstance(s, float)):
         return s
     multiplicators = {
+        "kbps": 1e3,
         "Mbps": 1e6,
-        "Gbps": 1e9
+        "Gbps": 1e9,
+        "bps": 1
     }
     for key in multiplicators:
         if s.endswith(key):
@@ -60,7 +62,8 @@ def readDataUnit(s) -> float:
     }
     multiplicators = {
         "k" : 1e3,
-        "M" : 1e6
+        "M" : 1e6,
+        "G" : 1e9
     }
     firstMultiplicator = 8 #default to 8
     secondMultiplicator = 1

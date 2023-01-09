@@ -5,9 +5,10 @@
         "packetizer": false,
         "multiplexing": "FIFO",
         "analysis_option": ["IS"],
-        "time_unit": "s",
-        "data_unit": "b",
-        "rate_unit": "bps"
+        "time_unit": "us",
+        "data_unit": "B",
+        "rate_unit": "Mbps",
+        "min_packet_length": 4
     },
 
     "flows":
@@ -16,31 +17,29 @@
             "name": "f0",
             "path": ["s0-o0", "s1-o0"],
             "arrival_curve": {
-                "bursts": [1, "2kB"],
-                "rates": [1, 0.5]
+                "bursts": [10, "2kB"],
+                "rates": ["10kbps", 0.5]
             },
-            "min_packet_length": 1,
-            "max_packet_length": 1
+            "max_packet_length": 50,
+            "rate_unit": "kbps"
         },
         {
             "name": "f1",
             "path": ["s0-o0", "s1-o1"],
             "arrival_curve": {
-                "bursts": [1, 10],
-                "rates": [1, 0.5]
+                "bursts": ["10B"],
+                "rates": ["10kbps"]
             },
-            "min_packet_length": 1,
-            "max_packet_length": 1
+            "max_packet_length": 50
         },
         {
             "name": "f2",
             "path": ["s1-o0"],
             "arrival_curve": {
-                "bursts": [1, 10],
-                "rates": [1, 0.7]
+                "bursts": [10],
+                "rates": ["10kbps"]
             },
-            "min_packet_length": 1,
-            "max_packet_length": 1
+            "max_packet_length": "50B"
         }
     ],
 
@@ -49,26 +48,27 @@
         {
             "name": "s0-o0",
             "service_curve": {
-                "latencies": [1, 2],
-                "rates": [4,10]
+                "latencies": [10, 1000],
+                "rates": [4, "50Mbps"]
             },
-            "capacity": 10
+            "capacity": 100
         },
         {
             "name": "s1-o0",
             "service_curve": {
-                "latencies": [1,2],
-                "rates": [4,10]
+                "latencies": [10, "1ms"],
+                "rates": [4, 50]
             },
-            "capacity": 10
+            "capacity": 100,
+            "time_unit": "us"
         },
         {
             "name": "s1-o1",
             "service_curve": {
-                "latencies": [1],
-                "rates": [4]
+                "latencies": [10],
+                "rates": ["4Mbps"]
             },
-            "capacity": 10
+            "capacity": 100
         }
     ]
 }

@@ -376,7 +376,7 @@ class TSN_Analyzer():
         print("Done")
 
 
-    def analyze_all(self, netfile:str=None, methods:Union[list,str]=["TFA"], use_tfa:bool=True, use_sfa:bool=True) -> int:
+    def analyze_all(self, netfile:str=None, methods:Union[list,str]=None, use_tfa:bool=True, use_sfa:bool=True) -> int:
         '''
         Analyze the network with 4 methods: DNC, xTFA, Linear Solver, and panco
 
@@ -384,7 +384,8 @@ class TSN_Analyzer():
         -------------
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
-        methods: (Optional) [list | str] List of methods "TFA", "SFA", or "PLP", or a single string of one of the method
+        methods: (Optional) [list | str] List of methods "TFA", "SFA", "PLP", etc. Or a single string of one of the method.
+                 Default is None, it executes all available methods
         use_tfa, use_sfa: (Optional) [bool] to use TFA and/or SFA in panco PLP analysis.
 
         Return:
@@ -407,7 +408,7 @@ class TSN_Analyzer():
         return len(self.results) - start_res_num
 
 
-    def analyze_xtfa(self, netfile:str=None, methods:Union[list,str]=["TFA"]) -> None:
+    def analyze_xtfa(self, netfile:str=None, methods:Union[list,str]=None) -> None:
         '''
         Analyze the network with xTFA
 
@@ -416,8 +417,11 @@ class TSN_Analyzer():
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
         methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method. Ignores methods other than TFA
-                 Default is TFA
+                 Default is None, it executes all available methods
         '''
+        if methods is None:
+            methods = ["TFA"]
+
         netfile, methods = self._arg_check(netfile, methods, "xml")
         from_converted_file = self.script_handler.get_network_info(netfile, "converted", "")
 
@@ -512,7 +516,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_linear(self, netfile:str=None, methods:Union[list,str]=["TFA"]) -> None:
+    def analyze_linear(self, netfile:str=None, methods:Union[list,str]=None) -> None:
         '''
         Analyze the network with Linear solver
 
@@ -521,8 +525,10 @@ class TSN_Analyzer():
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
         methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method. Ignores methods other than TFA
-                 Default is TFA
+                 Default is None, it executes all available methods
         '''
+        if methods is None:
+            methods = ["TFA"]
         netfile, methods = self._arg_check(netfile, methods, "json")
 
         for mthd in methods:
@@ -607,7 +613,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_panco(self, netfile:str=None, methods:list=["PLP"], use_tfa:bool=True, use_sfa:bool=True) -> None:
+    def analyze_panco(self, netfile:str=None, methods:list=None, use_tfa:bool=True, use_sfa:bool=True) -> None:
         '''
         Analyze the network with panco FIFO analyzer
 
@@ -616,16 +622,23 @@ class TSN_Analyzer():
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
         methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method.
-                 Default is TFA
+                 Default is None, it executes all available methods
         '''
+        if methods is None:
+            methods = ["TFA", "SFA", "PLP", "ELP"]
         netfile, methods = self._arg_check(netfile, methods, "json")
-
 
         for mthd in methods:
             print(f"Analyzing \"{netfile}\" using panco-{mthd}...", end="", flush=True)
             if mthd not in {"TFA", "SFA", "PLP", "ELP"}:
                 print(f"Skip, no such method \"{mthd}\" for PLP solver")
                 continue
+            # determine if network is cyclic if using ELP
+            if mthd.upper() == "ELP":
+                self.script_handler.load_opnet(netfile)
+                if self.script_handler.is_cyclic():
+                    print("Skip: network has cyclic dependency and not allowed by panco ELP")
+                    return
                 
             panco_anzr = panco_analyzer(netfile)
             output_shaping = self.output_shaping == FORCE_SHAPER.AUTO or self.output_shaping == FORCE_SHAPER.ON
@@ -695,7 +708,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_dnc(self, netfile:str=None, methods:Union[list,str]=["TFA"]) -> None:
+    def analyze_dnc(self, netfile:str=None, methods:Union[list,str]=None) -> None:
         '''
         Analyze the network with xTFA
 
@@ -704,8 +717,10 @@ class TSN_Analyzer():
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
         methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method. Ignores "PLP"
-                 Default is TFA
+                 Default is None, it executes all available methods
         '''
+        if methods is None:
+            methods = ["TFA", "SFA"] # PMOO & TMA very slow so only execute on demand
         netfile, methods = self._arg_check(netfile, methods, "json")
 
         # result is a UTF-8 string containing json format of result separated by flows

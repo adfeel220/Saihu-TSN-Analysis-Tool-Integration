@@ -109,13 +109,16 @@ class panco_analyzer():
                 warnings.warn("Capacity of server \"{0}\" is non-positive, should at least >0. Ignore using shaper.".format(ser["name"]))        
 
             # Assign server packet lengths by the maximum of max-packet-length of all flows that passes through this server
-            pkt_len = [fl.get("max_packet_length", 0) for fl in self.__get_flows(ser["id"])]    # packet lengths of the involved flows
+            pkt_len = [fl.get("max_packet_length", None) for fl in self.__get_flows(ser["id"])]    # packet lengths of the involved flows
+            if len(pkt_len) == 0:
+                warnings.warn("No flow passes through server \"{0}\", you may remove it from the analysis".format(ser["name"]))
+                self.server_no_flow.add(ser["id"])
+
+            pkt_len = [mpl for mpl in pkt_len if mpl is not None]
             if len(pkt_len) > 0:
                 ser["max_packet_length"] = max(pkt_len)
             else:
-                warnings.warn("No flow passes through server \"{0}\", you may remove it from the analysis".format(ser["name"]))
-                self.server_no_flow.add(ser["id"])
-                ser['max_packet_length'] = 0
+                self.shaper_defined = False
 
         
     def is_loaded(self)->bool:
@@ -153,10 +156,11 @@ class panco_analyzer():
                 rl_curve = RateLatency(rate=rates[i], latency=latencies[i])
                 service_curves.append(rl_curve)
             if use_shaper:
-                if not self.shaper_defined:
-                    raise RuntimeError("No shaper defined in network while trying to force applying shapers")
-                tb_curve = TokenBucket(ser["max_packet_length"], ser["capacity"])
-                shapers.append(tb_curve)
+                if self.shaper_defined:
+                    tb_curve = TokenBucket(ser["max_packet_length"], ser["capacity"])
+                    shapers.append(tb_curve)
+                else:
+                    warnings.warn("No shaper defined in network while trying to force applying shapers, switch to no shaper")
 
             # Append servers
             self.servers.append(Server(service_curves, shapers))

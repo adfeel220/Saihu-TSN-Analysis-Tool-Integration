@@ -3,7 +3,6 @@ import xml.etree.ElementTree as ET
 import xml.dom.minidom as md
 import json
 from copy import deepcopy
-import numpy as np
 
 # Solve path issue
 import os.path
@@ -11,8 +10,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 # Import my own modules
-from netdef import PhysicalNet, OutputPortNet
-from netdef import network_param, Wopanet_default_units
+from netdef import *
 from unit_util import *
 
 def check_file_ext(fpath:str, ext:str) -> str:
@@ -88,6 +86,13 @@ def add_text_in_ext(fname:str, *text:str, sep:str="_") -> str:
     else:
         return name
         
+def serialize_number(xdict:dict):
+    '''
+    Turn all numbers in a dictionary into a string
+    '''
+    for k, v in xdict.items():
+        if type(v) is float or type(v) is int:
+            xdict[k] = str(v)
 
 
 class NetworkScriptHandler:
@@ -338,7 +343,16 @@ class NetworkScriptHandler:
             "rate": network_info.pop("rate_unit", None)
         }
 
+        dataunit = units["data"] if units["data"] is not None else 'b'
+        max_pkt_len = network_info.pop("max_packet_length", None)
+        if max_pkt_len is not None:
+            network_info["maximum-packet-size"] = f"{max_pkt_len}{dataunit}" if is_number(max_pkt_len) else str(max_pkt_len)
+        min_pkt_len = network_info.pop("min_packet_length", None)
+        if min_pkt_len is not None:
+            network_info["minimum-packet-size"] = f"{min_pkt_len}{dataunit}" if is_number(min_pkt_len) else str(min_pkt_len)
+
         network_info["converted"] = ifpath
+        serialize_number(network_info)
         network_info = ET.SubElement(root, "network", network_info)
 
         ######################################
@@ -387,14 +401,15 @@ class NetworkScriptHandler:
             # Write server information
             server_info = {
                 "name": phy_name,
-                "service-latency": "{latency}".format(latency=latency * get_time_unit(units["time"], Wopanet_default_units["time"])),
-                "service-rate": "{rate}".format(rate=rate * get_rate_unit(units["rate"], Wopanet_default_units["rate"]))
+                "service-latency": "{latency}{unit}".format(latency=latency * get_time_unit(json_default_units["time"], Wopanet_default_units["time"]), unit=Wopanet_default_units["time"]),
+                "service-rate": "{rate}".format(rate=rate * get_rate_unit(json_default_units["rate"], Wopanet_default_units["rate"]))
             }
             if capacity is not None:
-                server_info["transmission-capacity"] = "{capacity}".format(capacity=capacity * get_rate_unit(units["rate"], Wopanet_default_units["rate"]))
+                server_info["transmission-capacity"] = "{capacity}".format(capacity=capacity * get_rate_unit(json_default_units["rate"], Wopanet_default_units["rate"]))
             
             # Multiple output port may map to the same physical node. In this case we only need to add one switch/station to the network
             if phy_name not in server_names:
+                serialize_number(server)
                 ET.SubElement(root, server_type, server_info, **server)
 
             server_names.append(phy_name)
@@ -461,29 +476,25 @@ class NetworkScriptHandler:
 
             path = flow.pop("path")
 
-            if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
-                burst_str = "{b}{unit}".format(b=burst, unit=units["data"])
-            else:
-                burst_str = str(burst * get_data_unit(units["data"], Wopanet_default_units["data"]))
-
             flow_info = {
                 "name": fl_name,
                 "arrival-curve": curve_type,
-                "lb-burst": burst_str,
-                "lb-rate": "{rate}".format(rate=rate * get_rate_unit(units["rate"], Wopanet_default_units["rate"])),
+                "lb-burst": "{b}{unit}".format(b=burst * get_data_unit(json_default_units["data"], Wopanet_default_units["data"]), unit=Wopanet_default_units["data"]),
+                "lb-rate": "{rate}".format(rate=rate * get_rate_unit(json_default_units["rate"], Wopanet_default_units["rate"])),
                 "source": sources[fid]
             }
             if max_packet_len is not None:
-                if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
-                    flow_info["maximum-packet-size"] = "{max_pkl}{unit}".format(max_pkl=max_packet_len, unit=units["data"])
+                if get_data_unit(json_default_units["data"], Wopanet_default_units["data"]) < 1:
+                    flow_info["maximum-packet-size"] = "{max_pkl}{unit}".format(max_pkl=max_packet_len, unit=json_default_units["data"])
                 else:
-                    flow_info["maximum-packet-size"] = str(max_packet_len * get_data_unit(units["data"], Wopanet_default_units["data"]))
+                    flow_info["maximum-packet-size"] = "{max_pkl}{unit}".format(max_pkl=max_packet_len * get_data_unit(json_default_units["data"], Wopanet_default_units["data"]), unit=Wopanet_default_units["data"])
             if min_packet_len is not None:
-                if get_data_unit(units["data"], Wopanet_default_units["data"]) < 1:
-                    flow_info["minimum-packet-size"] = "{min_pkl}{unit}".format(min_pkl=min_packet_len, unit=units["data"])
+                if get_data_unit(json_default_units["data"], Wopanet_default_units["data"]) < 1:
+                    flow_info["minimum-packet-size"] = "{min_pkl}{unit}".format(min_pkl=min_packet_len, unit=json_default_units["data"])
                 else:
-                    flow_info["minimum-packet-size"] = str(min_packet_len * get_data_unit(units["data"], Wopanet_default_units["data"]))
+                    flow_info["minimum-packet-size"] = "{min_pkl}{unit}".format(min_pkl=min_packet_len * get_data_unit(json_default_units["data"], Wopanet_default_units["data"]), unit=Wopanet_default_units["data"])
 
+            serialize_number(flow)
             flow_elem = ET.SubElement(root, "flow", flow_info, **flow)
             path_elem = ET.SubElement(flow_elem, "target")
 

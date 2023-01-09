@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <elements>
-    <network name="demo" technology="FIFO+IS" minimum-packet-size="1b"/>
+    <network name="demo" technology="FIFO+IS" minimum-packet-size="4B"/>
 
     <!-- Stations/switchs -->
     <station name="src0"/>
     <station name="src1"/>
     <station name="src2"/>
 
-    <switch name="s0" service-latency="1s" service-rate="4" transmission-capacity="10"/>
-    <switch name="s1" service-latency="1s" service-rate="4" transmission-capacity="10"/>
+    <switch name="s0" service-latency="10us" service-rate="4Mbps" />
+    <switch name="s1" service-latency="10us" service-rate="4Mbps" />
 
     <station name="sink0"/>
     <station name="sink1"/>
@@ -18,26 +18,26 @@
     <link from="src0" to="s0"    fromPort="o0" toPort="i0" name="lk:src0-s0"/>
     <link from="src1" to="s0"    fromPort="o0" toPort="i1" name="lk:src1-s0"/>
     <link from="src2" to="s1"    fromPort="o0" toPort="i1" name="lk:src2-s0"/>
-    <link from="s0"   to="s1"    fromPort="o0" toPort="i0" name="lk:s0-s1"/>
-    <link from="s1"   to="sink0" fromPort="o0" toPort="i0" name="lk:s1-sink0"/>
-    <link from="s1"   to="sink1" fromPort="o1" toPort="i0" name="lk:s1-sink1"/>
+    <link from="s0"   to="s1"    fromPort="o0" toPort="i0" transmission-capacity="10Mbps" name="lk:s0-s1"/>
+    <link from="s1"   to="sink0" fromPort="o0" toPort="i0" transmission-capacity="10Mbps" name="lk:s1-sink0"/>
+    <link from="s1"   to="sink1" fromPort="o1" toPort="i0" transmission-capacity="10Mbps" name="lk:s1-sink1"/>
 
     <!-- Flows -->
-    <flow name="f0" arrival-curve="leaky-bucket" lb-burst="1b" lb-rate="1" maximum-packet-size="1b" source="src0">
+    <flow name="f0" arrival-curve="leaky-bucket" lb-burst="10B" lb-rate="10kbps" maximum-packet-size="50B" source="src0">
         <target>
             <path node="s0"/>
             <path node="s1"/>
             <path node="sink0"/>
         </target>
     </flow>
-    <flow name="f1" arrival-curve="leaky-bucket" lb-burst="1b" lb-rate="1" maximum-packet-size="1b" source="src1">
+    <flow name="f1" arrival-curve="leaky-bucket" lb-burst="10B" lb-rate="10kbps" maximum-packet-size="50B" source="src1">
         <target>
             <path node="s0"/>
             <path node="s1"/>
             <path node="sink1"/>
         </target>
     </flow>
-    <flow name="f2" arrival-curve="leaky-bucket" lb-burst="1b" lb-rate="1" maximum-packet-size="1b" source="src2">
+    <flow name="f2" arrival-curve="leaky-bucket" lb-burst="10B" lb-rate="10kbps" maximum-packet-size="50B" source="src2">
         <target>
             <path node="s1"/>
             <path node="sink0"/>

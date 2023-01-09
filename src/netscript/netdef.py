@@ -31,8 +31,14 @@ keysInWopanetXML = {
 
 # The default unit used when it's written as a pure string number
 Wopanet_default_units = {
-    "time": "ms",
-    "data": "B",
+    "time": "s",
+    "data": "b",
+    "rate": "bps"
+}
+
+json_default_units = {
+    "time": "s",
+    "data": "b",
     "rate": "bps"
 }
 
@@ -447,22 +453,24 @@ class OutputPortNet:
             # maximum packet length:
             # it tries to find a local definition, if locally not defined, use the network default,
             # if network default is still not defined, use the maximum burst among all bursts
-            default_max_pkt_len = network_def["network"].get("max_packet_length", max(arrival_curve["bursts"]))
+            default_max_pkt_len = network_def["network"].get("max_packet_length", None)
             max_pkt_len = fl.get("max_packet_length", default_max_pkt_len)
-            max_pkt_len = try_raise(f"Parsing flows.max_packet_length of \"{flow_name}\"", max_pkt_len, self._convert_unit, max_pkt_len, unit["data"], "data")
-            if max_pkt_len < 0:
-                raise ValueError(f"Maximum packet length of flow {flow_name} is negative ({max_pkt_len}), should at least >= 0.")
-            fl["max_packet_length"] = max_pkt_len
+            if max_pkt_len is not None:
+                max_pkt_len = try_raise(f"Parsing flows.max_packet_length of \"{flow_name}\"", max_pkt_len, self._convert_unit, max_pkt_len, unit["data"], "data")
+                if max_pkt_len < 0:
+                    raise ValueError(f"Maximum packet length of flow {flow_name} is negative ({max_pkt_len}), should at least >= 0.")
+                fl["max_packet_length"] = max_pkt_len
 
             # minimum packet length:
             # it tries to find a local definition, if locally not defined, use the network default,
             # if network default is still not defined, use the minimum burst among all bursts
-            default_min_pkt_len = network_def["network"].get("min_packet_length", min(arrival_curve["bursts"]))
+            default_min_pkt_len = network_def["network"].get("min_packet_length", None)
             min_pkt_len = fl.get("min_packet_length", default_min_pkt_len)
-            min_pkt_len = try_raise(f"Parsing flows.min_packet_length of \"{flow_name}\"", min_pkt_len, self._convert_unit, min_pkt_len, unit["data"], "data")
-            if min_pkt_len < 0:
-                raise ValueError(f"Minimum packet length of flow {flow_name} is negative ({min_pkt_len}), should at least >= 0.")
-            fl["min_packet_length"] = min_pkt_len
+            if min_pkt_len is not None:
+                min_pkt_len = try_raise(f"Parsing flows.min_packet_length of \"{flow_name}\"", min_pkt_len, self._convert_unit, min_pkt_len, unit["data"], "data")
+                if min_pkt_len < 0:
+                    raise ValueError(f"Minimum packet length of flow {flow_name} is negative ({min_pkt_len}), should at least >= 0.")
+                fl["min_packet_length"] = min_pkt_len
 
             self.flows.append(fl)
 
