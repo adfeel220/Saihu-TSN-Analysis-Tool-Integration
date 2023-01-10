@@ -10,21 +10,28 @@ from unit_util import *
 # Generate certain type of network #
 ####################################
 
-def generate_interleave_tandem(size:int, burst:float, arr_rate:float, pkt_leng:float, latency:float, ser_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
     '''
-    Generate an interleaved tandem with all arrival/service curves being identical.
+    Generate an interleave tandem with all arrival/service curves being identical.
+    An interleave tandem network is a chain topology,
+    ------    ------        --------    --------
+    | s0 | -> | s1 | -> ... | sn-2 | -> | sn-1 |
+    ------    ------        --------    --------
+    With flows
+    f0: s0->s1->...->sn-1
+    fi: fi-1 -> fi, for all i in [1, n-1]
 
     Params:
     -------------
-    size    : size of the network = number of servers = number of flows
+    size : size of the network = number of servers = number of flows
 
-    burst   : burst of flows
-    arr_rate: arrival rate of flows
-    pkt_leng: maximum packet length of flows
+    burst             : burst of flows
+    arrival_rate      : arrival rate of flows
+    max_packet_length : maximum packet length of flows
 
-    latency : service latency
-    ser_rate: service rate
-    capacity: server capacity
+    latency      : service latency
+    service_rate : service rate
+    capacity     : server output capacity, unit in bps
     
     dir: directory to dump the generated json file. If it's None, no file will be dumped.
 
@@ -38,10 +45,10 @@ def generate_interleave_tandem(size:int, burst:float, arr_rate:float, pkt_leng:f
     servers = [None]*size
     for server_idx in range(size):
         servers[server_idx] = {
-            "name": f"s_{server_idx}",
+            "name": f"s{server_idx}",
             "service_curve": {
                 "latencies": [latency],
-                "rates": [ser_rate]
+                "rates": [service_rate]
             },
             "capacity": capacity
         }
@@ -50,24 +57,25 @@ def generate_interleave_tandem(size:int, burst:float, arr_rate:float, pkt_leng:f
     flows = [None]*size
     # 1. The flow to go through the entire network (chain)
     through_flow = {
+        "name": "f0",
         "path": [servers[idx]["name"] for idx in np.arange(size)],
         "arrival_curve": {
             "bursts": [burst],
-            "rates": [arr_rate]
+            "rates": [arrival_rate]
         },
-        "max_packet_length": pkt_leng
+        "max_packet_length": max_packet_length
     }
     flows[0] = through_flow
     # 2. The flows to "interleave" the servers. Flows through every adjacent pair of servers.
     for flow_idx in range(1, size):
         flows[flow_idx] = {
-            "name": f"fl_{flow_idx}",
+            "name": f"f{flow_idx}",
             "path": [servers[flow_idx-1]["name"], servers[flow_idx]["name"]],
             "arrival_curve": {
                 "bursts": [burst],
-                "rates": [arr_rate]
+                "rates": [arrival_rate]
             },
-            "max_packet_length": pkt_leng
+            "max_packet_length": max_packet_length
         }
 
 
@@ -88,19 +96,31 @@ def generate_interleave_tandem(size:int, burst:float, arr_rate:float, pkt_leng:f
 
 
 
-def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency:float, ser_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
     '''
     Generate a ring with all arrival/service curves being identical.
+    An interleave tandem network is a chain topology,
+    ------    ------        --------    --------
+    | s0 | -> | s1 | -> ... | sn-2 | -> | sn-1 |
+    ------    ------        --------    --------
+       î                                    |
+       --------------------------------------
+    With flows
+    f0: s0 -> ... -> sn-1
+    f1: s1 -> ... -> sn-1 -> s0
+    f2: s2 -> ... -> sn-1 -> s0 -> s1
+    ...
+    fn-1: sn-1 -> s0 -> s1 -> ... -> sn-2
 
     Params:
-    size    : size of the network = number of servers = number of flows
+    size : size of the network = number of servers = number of flows
 
-    burst   : burst of flows
-    arr_rate: arrival rate of flows
-    pkt_leng: packet length of flows
+    burst        : burst of flows
+    arrival_rate : arrival rate of flows
+    max_packet_length: packet length of flows
 
     latency : service latency
-    ser_rate: service rate
+    service_rate: service rate
     capacity: server capacity
     
     dir: directory to dump the generated json file. If it's None, no file will be dumped.
@@ -111,10 +131,10 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
     servers = [None]*size
     for server_idx in range(size):
         servers[server_idx] = {
-            "name": f"s_{server_idx}",
+            "name": f"s{server_idx}",
             "service_curve": {
                 "latencies": [latency],
-                "rates": [ser_rate]
+                "rates": [service_rate]
             },
             "capacity": capacity
         }
@@ -126,13 +146,13 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
         path = np.roll(np.arange(size), -flow_idx)
         path = [servers[idx]["name"] for idx in path]
         flows[flow_idx] = {
-            "name": f"fl_{flow_idx}",
+            "name": f"f{flow_idx}",
             "path": path,
             "arrival_curve": {
                 "bursts": [burst],
-                "rates": [arr_rate]
+                "rates": [arrival_rate]
             },
-            "max_packet_length": pkt_leng
+            "max_packet_length": max_packet_length
         }
 
 
@@ -152,7 +172,7 @@ def generate_ring(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
 
 
 
-def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency:float, ser_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_mesh(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
     '''
     Generate a mesh network, which has the topology
     ------   ------      --------
@@ -164,18 +184,18 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
     ------   ------      --------
 
     The flows are all combination from s0/s1 to sn
-    Note that the last server "sn" has service rate = 2*ser_rate since there are twice as many flows
+    Note that the last server "sn" has service rate = 2*service_rate since there are twice as many flows
 
     Parameters:
     ---------------
     size: the number of servers in the network, if size is even, will return one network with size+1 servers having an extra server at the end
 
     burst   : burst of flows
-    arr_rate: arrival rate of flows
-    pkt_leng: packet length of flows
+    arrival_rate: arrival rate of flows
+    max_packet_length: packet length of flows
 
     latency : service latency
-    ser_rate: service rate
+    service_rate: service rate
     capacity: server capacity
     '''
     print(f"Generating a mesh network of {size} servers...", end='')
@@ -216,7 +236,7 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
             "name": f"s_{server_idx}",
             "service_curve": {
                 "latencies": [latency],
-                "rates": [ser_rate]
+                "rates": [service_rate]
             },
             "capacity": capacity
         }
@@ -224,7 +244,7 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
         "name": f"s_{size-1}",
         "service_curve": {
             "latencies": [latency],
-            "rates": [2*ser_rate]
+            "rates": [2*service_rate]
         },
         "capacity": capacity
     }
@@ -244,9 +264,9 @@ def generate_mesh(size:int, burst:float, arr_rate:float, pkt_leng:float, latency
             "path": path,
             "arrival_curve": {
                 "bursts": [burst],
-                "rates": [arr_rate]
+                "rates": [arrival_rate]
             },
-            "max_packet_length": pkt_leng
+            "max_packet_length": max_packet_length
         }
 
 

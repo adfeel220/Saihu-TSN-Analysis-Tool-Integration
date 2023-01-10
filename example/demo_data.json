@@ -1,0 +1,51 @@
+{
+    "name": "demo",
+    "flow_e2e_delay": {
+        "f0": {
+            "DNC_TFA": 100.00375,
+            "xTFA_TFA": 99.32394489448944,
+            "Panco_TFA": 100.12500000000001,
+            "Panco_PLP": 80.05
+        },
+        "f1": {
+            "DNC_TFA": 80.075,
+            "xTFA_TFA": 79.32193219321933,
+            "Panco_TFA": 80.12500000000001,
+            "Panco_PLP": 80.07
+        },
+        "f2": {
+            "DNC_TFA": 50.00375,
+            "xTFA_TFA": 49.32394489448944,
+            "Panco_TFA": 50.125,
+            "Panco_PLP": 50.07
+        }
+    },
+    "server_delay": {
+        "s0-o0": {
+            "DNC_TFA": 50.0,
+            "xTFA_TFA": 50.0,
+            "Panco_TFA": 50.0
+        },
+        "s1-o0": {
+            "DNC_TFA": 50.00375,
+            "xTFA_TFA": 49.32394489448944,
+            "Panco_TFA": 50.125
+        },
+        "s1-o1": {
+            "DNC_TFA": 30.075,
+            "xTFA_TFA": 29.321932193219325,
+            "Panco_TFA": 30.125
+        }
+    },
+    "execution_time": {
+        "DNC_TFA": 23.0,
+        "xTFA_TFA": 46.0200309753418,
+        "Panco_TFA": 23.83899688720703,
+        "Panco_PLP": 144.8960304260254
+    },
+    "units": {
+        "flow_delay": "us",
+        "server_delay": "us",
+        "exectution_time": "ms"
+    }
+}

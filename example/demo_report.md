@@ -15,41 +15,41 @@ Table of Contents
 	* [Network Link Utilization](#network-link-utilization)
 
 
-The is a automatically generated report with project `TSN Analysis Tools Intergration`
+The is a automatically generated report with `Saihu` [Github Link](https://github.com/adfeel220/TSN_Analysis_Tool_Integration)
 
 # Network Analysis Result
 
 ## Per flow end-to-end delay bound
   
-Unit in s
-|Flow name|Panco-PLP|DNC-TFA|Linear-TFA|Panco-TFA|xTFA-TFA|
-| :---: | :---: | :---: | :---: | :---: | :---: |
-|f0|2.812|3.156|3.292|3.292|3.236|
-|f1|2.958|2.906|3.000|3.000|2.917|
-|f2|1.743|1.656|1.792|1.792|1.736|
+Unit in us
+|Flow name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
+| :---: | :---: | :---: | :---: | :---: |
+|f0|80.050|100.004|100.125|99.324|
+|f1|80.070|80.075|80.125|79.322|
+|f2|50.070|50.004|50.125|49.324|
 
 ## Per server delay bound
   
-Unit in s
-|server name|Panco-PLP|DNC-TFA|Linear-TFA|Panco-TFA|xTFA-TFA|
-| :---: | :---: | :---: | :---: | :---: | :---: |
-|s0-o0|N/A|1.500|1.500|1.500|1.500|
-|s1-o0|N/A|1.656|1.792|1.792|1.736|
-|s1-o1|N/A|1.406|1.500|1.500|1.417|
-|Total|N/A|4.562|4.792|4.792|4.653|
+Unit in us
+|server name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
+| :---: | :---: | :---: | :---: | :---: |
+|s0-o0|N/A|50.000|50.000|50.000|
+|s1-o0|N/A|50.004|50.125|49.324|
+|s1-o1|N/A|30.075|30.125|29.322|
+|Total|N/A|130.079|130.250|128.646|
 
 ## Execution Time
   
 Unit in milliseconds
-|method\tool|DNC|Linear|Panco|xTFA|
-| :---: | :---: | :---: | :---: | :---: |
-|PLP|N/A|N/A|162.277|N/A|
-|TFA|15.000|38.296|28.989|6.404|
+|method\tool|DNC|Panco|xTFA|
+| :---: | :---: | :---: | :---: |
+|PLP|N/A|144.896|N/A|
+|TFA|23.000|23.839|46.020|
 
 # Network Information
 
 
-This report contains 5 analysis over network **"demo"**.
+This report contains 4 analysis over network **"demo"**.
 There are **3** servers and **3** flows in the system.
 ## Network Topology
   
@@ -63,11 +63,11 @@ There are **3** servers and **3** flows in the system.
 ## Network Link Utilization
   
 Utilization for each link:
-- `s0-o0`: 0.5
-- `s1-o0`: 0.5
-- `s1-o1`: 0.25
+- `s0-o0`: 0.005
+- `s1-o0`: 0.005
+- `s1-o1`: 0.0025
   
-**Maximum Link Utilization** = 0.5
+**Maximum Link Utilization** = 0.005
 
 
 [topo]: ./demo_topo.png

@@ -39,7 +39,8 @@
                 "bursts": [10],
                 "rates": ["10kbps"]
             },
-            "max_packet_length": "50B"
+            "max_packet_length": "50B",
+            "min_packet_length": "4B"
         }
     ],
 

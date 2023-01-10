@@ -519,10 +519,10 @@ Use functions from `src/netscript/net_gen.py`, there are 3 types of network that
 All 3 methods take the same parameters:
 - `size`: The number of servers in the network.
 - `burst`: The burst of arrival curve of each flow.
-- `arr_rate`: The arrival rate of arrival curve of each flow.
-- `pkt_leng`: Packet length of each flow.
+- `arrival_rate`: The arrival rate of arrival curve of each flow.
+- `max_packet_length`: Packet length of each flow.
 - `latency`: Latency of each server.
-- `ser_rate`: Service rate of each server.
+- `service_rate`: Service rate of each server.
 - `capacity`: The transmission capacity of each server.
 - `dir`: (Optional) The output file to store the generated network. Default is `None`, which is not writing the network to file, but return a dictionary of all information instead (the dictionary as loaded from a `.json` file.)
 
@@ -677,10 +677,10 @@ from netscript.net_gen import *
 
 generate_ring(size=10,
               burst=1,
-              arr_rate=1,
-              pkt_leng=0,
+              arrival_rate=1,
+              max_packet_length=0,
               latency=1,
-              ser_rate=20,
+              service_rate=20,
               capacity=20,
               dir="./ring.json")
 analyzer = TSN_Analyzer("./ring.json", temp_path="./temp/", use_shaper="AUTO")

@@ -8,4 +8,4 @@ from netscript.net_gen import *
 if __name__ == "__main__":
     analyzer = TSN_Analyzer("demo.json", temp_path="./temp/")
     analyzer.analyze_all(methods=["TFA", "PLP"])
-    analyzer.export("test")
+    analyzer.export("demo")
