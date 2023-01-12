@@ -321,7 +321,7 @@ class TSN_Analyzer():
 
             # Tool-method execution time
             mdFile.new_header(level=2, title="Execution Time")
-            self._build_performance_table(mdFile, res_sorted)
+            self._build_exec_time_table(mdFile, res_sorted)
 
             ##############
             # Input part #
@@ -333,7 +333,7 @@ class TSN_Analyzer():
             # topology
             graph = None
             for r in res:
-                if r.graph is not None:
+                if r.graph is not None and not r.is_converted():
                     graph = r.graph
                     break
             if graph is not None:
@@ -400,10 +400,10 @@ class TSN_Analyzer():
         op_net_path, phy_net_path = self.convert_netfile(netfile)
 
         start_res_num = len(self.results)
-        self.analyze_dnc(op_net_path, methods=methods)
-        self.analyze_linear(op_net_path, methods=methods)
-        self.analyze_xtfa(phy_net_path, methods=methods)
         self.analyze_panco(op_net_path, methods=methods, use_tfa=use_tfa, use_sfa=use_sfa)
+        self.analyze_dnc(op_net_path, methods=methods)
+        # self.analyze_linear(op_net_path, methods=methods)
+        self.analyze_xtfa(phy_net_path, methods=methods)
 
         return len(self.results) - start_res_num
 
@@ -499,9 +499,6 @@ class TSN_Analyzer():
                 tool  = "xTFA",
                 method = mthd.upper(),
                 graph  = graph,
-                num_servers = len(server_delays),
-                num_flows   = len(flow_paths),
-                total_delay = total_network_delay,
                 server_delays = server_delays,
                 flow_paths  = flow_paths,
                 flow_cmu_delays = flow_cmu_delays,
@@ -1044,7 +1041,8 @@ class TSN_Analyzer():
         '''
         mdFile.new_header(level=2, title=f"Per flow end-to-end delay bound")
         # mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.flow_delay_mul]}seconds")
-        mdFile.new_line("Unit in {}".format(self._units["flow_delay"]))
+        mul, unit = unit_util.split_multiplier_unit(self._units["flow_delay"])
+        mdFile.new_line("Unit in {m}{u}".format(m=unit_util.multiplier_names[mul], u=unit_util.time_unit_names[unit]))
 
         paths = dict()
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
@@ -1119,7 +1117,8 @@ class TSN_Analyzer():
             return
         
         mdFile.new_header(level=2, title=f"Per server {title_name} bound")
-        mdFile.new_line("Unit in {}".format(self._units["server_delay"]))
+        mul, unit = unit_util.split_multiplier_unit(self._units["server_delay"])
+        mdFile.new_line("Unit in {m}{u}".format(m=unit_util.multiplier_names[mul], u=unit_util.time_unit_names[unit]))
         # mdFile.new_line(f"Unit in {unit_util.multiplier_names[multiplier]}{unit}")
 
         # Table with mapping assigned
@@ -1196,9 +1195,9 @@ class TSN_Analyzer():
         mdFile.new_table(rows=len(path)+1, columns=len(tlm_mapping)+1, text=table_res)
 
 
-    def _build_performance_table(self, mdFile:mdu, tm_results:dict)->None:
+    def _build_exec_time_table(self, mdFile:mdu, tm_results:dict)->None:
         '''
-        Build a flow result table on flow_of_interest over mdFile using result_dict
+        Build a table of execution time of each tool/method pair
 
         Inputs:
         ---------
@@ -1212,7 +1211,7 @@ class TSN_Analyzer():
                 result_method_dict[r.method] = list()
             result_method_dict[r.method].append(r)
 
-        mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.exec_time_mul]}seconds")
+        mdFile.new_line(f"Unit in {unit_util.multiplier_names[self.exec_time_mul]}second")
 
         tools = set()
         for ress in result_method_dict.values():

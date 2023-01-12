@@ -21,7 +21,7 @@ The is a automatically generated report with `Saihu` [Github Link](https://githu
 
 ## Per flow end-to-end delay bound
   
-Unit in us
+Unit in microsecond
 |Flow name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
 | :---: | :---: | :---: | :---: | :---: |
 |f0|80.050|100.004|100.125|99.324|
@@ -30,7 +30,7 @@ Unit in us
 
 ## Per server delay bound
   
-Unit in us
+Unit in microsecond
 |server name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
 | :---: | :---: | :---: | :---: | :---: |
 |s0-o0|N/A|50.000|50.000|50.000|
@@ -40,11 +40,11 @@ Unit in us
 
 ## Execution Time
   
-Unit in milliseconds
+Unit in millisecond
 |method\tool|DNC|Panco|xTFA|
 | :---: | :---: | :---: | :---: |
-|PLP|N/A|144.896|N/A|
-|TFA|23.000|23.839|46.020|
+|PLP|N/A|176.434|N/A|
+|TFA|19.000|33.201|65.094|
 
 # Network Information
 

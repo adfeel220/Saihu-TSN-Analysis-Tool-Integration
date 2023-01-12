@@ -41,9 +41,20 @@ time_units = {
     's': 1      # second
 }
 
+time_unit_names = {
+    'h': 'hour',
+    'm': 'minute',
+    's': 'second'
+}
+
 data_units = {
     'b': 1,     # bit
     'B': 8      # Byte
+}
+
+data_unit_names = {
+    'b': 'bit',
+    'B': 'byte'
 }
 
 def is_number(num_str:str) -> bool:

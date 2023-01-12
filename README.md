@@ -4,7 +4,7 @@ Author: Chun-Tso Tsai
 
 Advisors: Seyed Mohammadhossein Tabatabaee, Stéphan Plassart, Jean-Yves Le Boudec
 
-Date: 2023-01-08
+Date: 2023-01-12
 
 Institute: Computer Communications and Applications Laboratory 2 (LCA2), École Polytechnique Fédérale de Lausane (EPFL)
 
@@ -43,9 +43,12 @@ Table of Contents
 # Introduction
 **Time-Sensitive Networking (TSN)** analysis focuses on giving deterministic delay or backlog guarantees. This project integrates 4 different TSN analysis tools, including `Linear TFA Solver`, [NetCal/DNC](https://github.com/NetCal/DNC), [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa), and [panco](https://github.com/Huawei-Paris-Research-Center/panco). The users can use a common interface to compute network delay bounds obtained by different tools, and write the results into a formated report. All these actions requires only a few lines of code.
 
-The name **SAIHU** comes from **S**uperimposed worst-case delay
-**A**nalysis **I**nterface for **H**uman-friendly **U**sage." It’s also
-inspired by the Taiwanese word ‘師傅 (sai-hū)’, which means a master, an expert, or a qualified worker.
+The name **SAIHU** comes from **S**uperimposed worst-case delay **A**nalysis **I**nterface for **H**uman-friendly **U**sage." It’s also inspired by the Taiwanese word ‘師傅 (sai-hū)’, which means a master, an expert, or a qualified worker.
+
+## Pipeline
+Below states the pipeline and structure of Saihu.
+
+![pipeline](images/pipeline.png)
 
 ## Credit
 Here are the authors that implemented the individual tools used in this project.
