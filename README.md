@@ -11,6 +11,7 @@ Institute: Computer Communications and Applications Laboratory 2 (LCA2), École 
 Table of Contents
 ========================
 * [Introduction](#introduction)
+    * [Pipeline](#pipeline)
     * [Credit](#credit)
 * [Project Structure](#project-structure)
     * [File Description](#file-description)
@@ -49,6 +50,8 @@ The name **SAIHU** comes from **S**uperimposed worst-case delay **A**nalysis **I
 Below states the pipeline and structure of Saihu.
 
 ![pipeline](images/pipeline.png)
+
+From the bottom up, users have the option to use the interface according to the attributes and arrows labelled in red. The blue parts are the functions being handled inside Saihu interface, which integrates the tools labelled in green. The yellow part labels the work one need to do to include more tools in Saihu.
 
 ## Credit
 Here are the authors that implemented the individual tools used in this project.
