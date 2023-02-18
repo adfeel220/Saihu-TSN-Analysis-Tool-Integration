@@ -136,28 +136,28 @@ class TSN_Analyzer():
             print(f"No such shaper enforcement {enforce}, must in {list(FORCE_SHAPER)} ignore")
             self.output_shaping = FORCE_SHAPER.AUTO
 
-    def export(self, default_name:str="result", json_output:str=None, report_file:str=None, clear:bool=True)->None:
+    def export(self, default_name:str="result", result_json:str=None, report_md:str=None, clear:bool=True)->None:
         '''
-        Write the json output as well as the markdown report
+        Write the json result and the markdown report
 
         Inputs:
         ------------
         default_name : [str] Default naming of output files. 
-                       JSON output will have name [default_name]_data.json if json_output is not specified
-                       Markdown output will have name [default_name]_report.md if report_file is not specified
-        json_output : [str] File name for json output file
-        report_file : [str] File name for markdown report file
+                       JSON output will have name [default_name]_data.json if result_json is not specified
+                       Markdown output will have name [default_name]_report.md if report_md is not specified
+        result_json : [str] File name for json output file
+        report_md : [str] File name for markdown report file
         clear : [bool] Whether to clear the buffer after writing results. Default is True
         '''
-        if json_output is None:
-            json_output = add_text_in_ext(default_name, "data")
-        json_output = check_file_ext(json_output, "json")
-        if report_file is None:
-            report_file = add_text_in_ext(default_name, "report")
-        report_file = check_file_ext(report_file, "md")
+        if result_json is None:
+            result_json = add_text_in_ext(default_name, "data")
+        result_json = check_file_ext(result_json, "json")
+        if report_md is None:
+            report_md = add_text_in_ext(default_name, "report")
+        report_md = check_file_ext(report_md, "md")
 
-        self.write_result_json(json_output, clear=False)
-        self.write_report_md(report_file, clear=False)
+        self.write_result_json(result_json, clear=False)
+        self.write_report_md(report_md, clear=False)
 
         # Clear the current results
         if clear:
@@ -213,7 +213,7 @@ class TSN_Analyzer():
             result_json["flow_e2e_delay"] = dict()
             result_json["server_delay"] = dict()
             result_json["execution_time"] = dict()
-            result_json["units"] = {**self._units, "exectution_time": self.exec_time_mul+'s'}
+            result_json["units"] = {**self._units, "execution_time": self.exec_time_mul+'s'}
 
             for res in results:
 
@@ -297,7 +297,7 @@ class TSN_Analyzer():
 
             # Create the output Markdown file to write
             mdFile = mdu(file_name=output_file, title=f"Analysis Report - \"{net_name}\"")
-            mdFile.new_paragraph("The is a automatically generated report with `Saihu` [Github Link](https://github.com/adfeel220/TSN_Analysis_Tool_Integration)\n")
+            mdFile.new_paragraph("The is a automatically generated report with [Saihu](https://github.com/adfeel220/TSN_Analysis_Tool_Integration)\n")
             if comment is not None:
                 mdFile.new_line("**Comment:**")
                 mdFile.new_paragraph(comment)
@@ -376,7 +376,7 @@ class TSN_Analyzer():
         print("Done")
 
 
-    def analyze_all(self, netfile:str=None, methods:Union[list,str]=None, use_tfa:bool=True, use_sfa:bool=True) -> int:
+    def analyze_all(self, methods:Union[list,str]=None, netfile:str=None, use_tfa:bool=True, use_sfa:bool=True) -> int:
         '''
         Analyze the network with 4 methods: DNC, xTFA, Linear Solver, and panco
 
@@ -400,15 +400,15 @@ class TSN_Analyzer():
         op_net_path, phy_net_path = self.convert_netfile(netfile)
 
         start_res_num = len(self.results)
-        self.analyze_panco(op_net_path, methods=methods, use_tfa=use_tfa, use_sfa=use_sfa)
-        self.analyze_dnc(op_net_path, methods=methods)
-        # self.analyze_linear(op_net_path, methods=methods)
-        self.analyze_xtfa(phy_net_path, methods=methods)
+        self.analyze_panco(netfile=op_net_path, methods=methods, use_tfa=use_tfa, use_sfa=use_sfa)
+        self.analyze_dnc(netfile=op_net_path, methods=methods)
+        # self.analyze_linear(netfile=op_net_path, methods=methods)
+        self.analyze_xtfa(netfile=phy_net_path, methods=methods)
 
         return len(self.results) - start_res_num
 
 
-    def analyze_xtfa(self, netfile:str=None, methods:Union[list,str]=None) -> None:
+    def analyze_xtfa(self, methods:Union[list,str]=None, netfile:str=None) -> None:
         '''
         Analyze the network with xTFA
 
@@ -440,7 +440,13 @@ class TSN_Analyzer():
 
             # xTFA use the "technology" entry defined in the file for shaper usage, generate a new file that enforces the shaper technology
             file_enforce_method = self.script_handler.enforce_technology(in_filename=netfile, include_tech=include_tech, exclude_tech=exclude_tech, out_filename=add_text_in_ext(os.path.join(self._temp_path, "tempnet.xml"), "enforced"))
-            jsonnet = self.script_handler.phynet_to_opnet_json(file_enforce_method)
+            try:
+                if len(from_converted_file) > 0:
+                    jsonnet = OutputPortNet(ifile=from_converted_file)
+                else:
+                    jsonnet = OutputPortNet(network_def=self.script_handler.phynet_to_opnet_json(file_enforce_method))
+            except Exception:
+                jsonnet = None
 
             # Load the network into xTFA network to prepare for computation
             xtfa_net = xtfa.networks.CyclicNetwork(xtfa.fasUtility.TopologicalSort())
@@ -482,16 +488,22 @@ class TSN_Analyzer():
 
             # Ensure graph
             # if it's converted, name without port
-            if len(from_converted_file)>0:
-                server_names = [serv["name"].rsplit('-',1)[0] if serv["name"] in xtfa_net.gif.nodes else serv["name"] for serv in jsonnet["servers"]]
+            if jsonnet is None:
+                graph = xtfa_net.gif
             else:
-                server_names = [serv["name"] for serv in jsonnet["servers"]]
-            graph = nx.DiGraph(xtfa_net.gif.subgraph(server_names))
-            for nd in server_names:
-                if nd not in graph.nodes:
-                    graph.add_node(nd)
-                if nd not in server_delays:
-                    server_delays[nd] = 0.0
+                if len(from_converted_file)>0:
+                    server_names = [serv["name"].rsplit('-',1)[0] if serv["name"] in xtfa_net.gif.nodes else serv["name"] for serv in jsonnet.servers]
+                    graph = nx.from_numpy_array(jsonnet.adjacency_mat, create_using=nx.DiGraph)
+                    name_mapping = dict(zip(range(len(server_names)), server_names))
+                    graph = nx.relabel_nodes(graph, name_mapping)
+                else:
+                    server_names = [serv["name"] for serv in jsonnet.servers]
+                    graph = nx.DiGraph(xtfa_net.gif.subgraph(server_names))
+                    for nd in server_names:
+                        if nd not in graph.nodes:
+                            graph.add_node(nd)
+                        if nd not in server_delays:
+                            server_delays[nd] = 0.0
 
             # Extract general network information
             result = TSN_result(
@@ -513,7 +525,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_linear(self, netfile:str=None, methods:Union[list,str]=None) -> None:
+    def analyze_linear(self, methods:Union[list,str]=None, netfile:str=None) -> None:
         '''
         Analyze the network with Linear solver
 
@@ -610,7 +622,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_panco(self, netfile:str=None, methods:list=None, use_tfa:bool=True, use_sfa:bool=True) -> None:
+    def analyze_panco(self, methods:list=None, netfile:str=None, use_tfa:bool=True, use_sfa:bool=True) -> None:
         '''
         Analyze the network with panco FIFO analyzer
 
@@ -622,7 +634,7 @@ class TSN_Analyzer():
                  Default is None, it executes all available methods
         '''
         if methods is None:
-            methods = ["TFA", "SFA", "PLP", "ELP"]
+            methods = ["TFA", "SFA", "PLP"]
         netfile, methods = self._arg_check(netfile, methods, "json")
 
         for mthd in methods:
@@ -705,7 +717,7 @@ class TSN_Analyzer():
             print("Done")
 
 
-    def analyze_dnc(self, netfile:str=None, methods:Union[list,str]=None) -> None:
+    def analyze_dnc(self, methods:Union[list,str]=None, netfile:str=None) -> None:
         '''
         Analyze the network with xTFA
 
@@ -1034,6 +1046,10 @@ class TSN_Analyzer():
         '''
         Build a server result table on mdFile using result_dict, dict key = "tool-method", value is result object
 
+        If there are nf flows and nt tool-methods, the table will be nf+1 * nt+2
+        nf+1 rows: flow delays + tool-method names
+        nt+2 cols: tool-method pairs + flow names + minimum (best) delay bound
+
         Inputs:
         ---------
         mdFile: the markdown file to write
@@ -1047,23 +1063,33 @@ class TSN_Analyzer():
         paths = dict()
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
         flow_mapping = self._create_mapping(tm_results.values(), "flow_delays")
-        table_res = np.empty((len(flow_mapping)+1, len(tlm_mapping)+1), dtype='object')
+        table_res = np.empty((len(flow_mapping)+1, len(tlm_mapping)+2), dtype='object')
         table_res[:] = "N/A"
 
         # Column labels
-        table_res[0,:] = ["Flow name", *tlm_mapping.keys()]
+        table_res[0,:] = ["Flow name", *tlm_mapping.keys(), "Minimum (best)"]
         # row labels
         table_res[1:,0] = list(flow_mapping.keys())
+
+        # minimum: row=flow, col=tool-method
+        min_delay = np.ones((len(flow_mapping), len(tlm_mapping))) * np.inf
 
         for tlm, res in tm_results.items():
             paths.update(res.flow_paths)
             for flow_name, flow_delay in res.flow_delays.items():
-                table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay * unit_util.get_time_unit(res.time_unit, self._units["flow_delay"]))
+                # The number to be written 
+                delay_written = flow_delay * unit_util.get_time_unit(res.time_unit, self._units["flow_delay"])
+
+                table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(delay_written)
+                min_delay[flow_mapping[flow_name], tlm_mapping[tlm]] = delay_written
                 # table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay / unit_util.multipliers[self.flow_delay_mul])
+
+        # Write minimum value
+        table_res[1:, -1] = ["{:.3f}".format(v) for v in np.min(min_delay, axis=1)]
 
         # write into MD
         table_res = table_res.flatten().tolist()
-        mdFile.new_table(rows=len(flow_mapping)+1, columns=len(tlm_mapping)+1, text=table_res)
+        mdFile.new_table(rows=len(flow_mapping)+1, columns=len(tlm_mapping)+2, text=table_res)
         
 
     def _build_flow_paths(self, mdFile:mdu, tm_results:dict)->None:
@@ -1124,31 +1150,43 @@ class TSN_Analyzer():
         # Table with mapping assigned
         server_mapping = self._create_mapping(tm_results.values(), ["graph", "nodes"])
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
-        table_res = np.empty((len(server_mapping)+2, len(tlm_mapping)+1), dtype='object')
+        table_res = np.empty((len(server_mapping)+2, len(tlm_mapping)+2), dtype='object')
         table_res[:] = "N/A"
 
         # column/row labels
-        table_res[0,:] = ["server name", *tlm_mapping.keys()]
+        table_res[0,:]    = ["server name", *tlm_mapping.keys(), "Minimum (best)"]
         table_res[1:-1,0] = list(server_mapping.keys())
-        table_res[-1,0] = summary_label
+        table_res[-1,0]   = summary_label
+
+        # Minimum value
+        min_val = np.ones((len(server_mapping), len(tlm_mapping))) * np.inf
 
         for tlm, res in tm_results.items():
+            # When nothing is written in the result class
             if getattr(res, attr_name) is None:
                 continue
+            
             for server_name, attr_num in getattr(res, attr_name).items():
-                table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num * unit_util.get_time_unit(res.time_unit, self._units["server_delay"]))
+                val = attr_num * unit_util.get_time_unit(res.time_unit, self._units["server_delay"])
+                table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(val)
                 # table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num / unit_util.multipliers[multiplier])
+                min_val[server_mapping[server_name], tlm_mapping[tlm]] = val
 
             summary = getattr(res,summary_attr)
             if summary is None:
-                table_res[-1,tlm_mapping[tlm]+1] = "N/A"
+                continue
             else:
                 table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary * unit_util.get_time_unit(res.time_unit, self._units["server_delay"]))
                 # table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary/unit_util.multipliers[multiplier])
+        
+        # Write minimum value
+        min_val = np.min(min_val, axis=1)
+        table_res[1:-1, -1] = ["{:.3f}".format(v) for v in min_val]
+        table_res[-1, -1] = "{:.3f}".format(np.sum(min_val))
 
         # write into MD
         table_res = table_res.flatten().tolist()
-        mdFile.new_table(rows=len(server_mapping)+2, columns=len(tlm_mapping)+1, text=table_res)
+        mdFile.new_table(rows=len(server_mapping)+2, columns=len(tlm_mapping)+2, text=table_res)
         
 
 
@@ -1252,7 +1290,9 @@ class TSN_Analyzer():
                 continue
             
             utility = self.script_handler.get_network_utility(res.network_source)
-            max_utility = max(utility.values())
+            max_utility = "N/A"
+            if len(utility) > 0:
+                max_utility = max(utility.values())
 
             mdFile.new_header(level=2, title="Network Link Utilization")
             mdFile.new_line("Utilization for each link:")

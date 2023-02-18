@@ -463,7 +463,8 @@ class Linear_TFA():
                     if self.flows[fl_idx]["path"].index(server_id)+1 == self.flows[fl_idx]["path"].index(succ):
                         seq_flows.append(fl_idx)
 
-                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in seq_flows) <= server["max_packet_length"] + server["capacity"]*in_time[succ]
+                packet_size = server["max_packet_length"] if self.network_info.get("packetizer", False) else 0.0
+                tfa_pp_prog += pulp.lpSum(arrivals[fl][succ] for fl in seq_flows) <= packet_size + server["capacity"]*in_time[succ]
 
         # Set objective function
         tfa_pp_prog += pulp.lpSum(delays)

@@ -157,7 +157,8 @@ class panco_analyzer():
                 service_curves.append(rl_curve)
             if use_shaper:
                 if self.shaper_defined:
-                    tb_curve = TokenBucket(ser["max_packet_length"], ser["capacity"])
+                    packet_size = ser["max_packet_length"] if self.network_info.get("packetizer", False) else 0.0
+                    tb_curve = TokenBucket(packet_size, ser["capacity"])
                     shapers.append(tb_curve)
                 else:
                     warnings.warn("No shaper defined in network while trying to force applying shapers, switch to no shaper")

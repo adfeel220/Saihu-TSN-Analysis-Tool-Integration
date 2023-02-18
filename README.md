@@ -367,12 +367,14 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
 - Constraints
     | Spec\Tool | DNC | xTFA | Panco | Linear TFA |
     | :--: | :-: | :--: | :---: | :----: |
-    | **Manual Tune Shaping*** |  | V | V | V |
-    | **Cyclic Dependent Network***   |  | V | V | V |
+    | **Manual Tune Shaping** |  | V | V | V |
+    | **Cyclic Dependent Network**   |  | V | V | V |
+    | **Multicast Flow** | | V | |
 
     Note: 
     1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 
     2. `Panco-ELP` doesn't allow cyclic dependent network.
+    3. Multicast flow can only be defined as a physical network.
 
 ### Public Methods
 To use our general interface, you need to first import class `TSN_Analyzer` from the file `src/interface.py`.
@@ -423,61 +425,62 @@ The 2 return values are paths to the network description files, one is the outpu
 
 ### analyze_all
 ```
-num_results = analyzer.analyze_all(netfile, methods, use_tfa, use_sfa)
+num_results = analyzer.analyze_all(methods, netfile, use_tfa, use_sfa)
 ```
 Use all available tools to do analysis given the methods. Return number of results that are computed.
 All parameters are **optional**:
-- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 - `methods`: A list of strings or a string specifying the analysis method. For the available values please refer to [Tool Specification](#tool-specification).
+- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 - `use_tfa`/`use_sfa`: Boolean variables to select whether to use TFA/SFA bounds for improving PLP bounds. Only relevant when using `panco`. Default is both `True`.
 
 The function returns the number of results loaded from the process.
 
 ### analyze_xtfa
 ```
-analyzer.analyze_xtfa(netfile, methods)
+analyzer.analyze_xtfa(methods, netfile)
 ```
 Analyze the network with `xTFA`. All parameters are optional:
-- `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 - `methods`: A list of strings or a string specifying the analysis method. For the available values please refer to [Tool Specification](#tool-specification).
+- `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 
 ### analyze_linear
 ```
-analyzer.analyze_linear(netfile, methods)
+analyzer.analyze_linear(methods, netfile)
 ```
 Analyze the network with `Linear TFA solver`. All parameters are optional:
-- `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 - `methods`: A list of strings or a string specifying the analysis method. For the available values please refer to [Tool Specification](#tool-specification).
+- `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 
 ### analyze_panco
 ```
-analyzer.analyze_panco(netfile, methods, )
+analyzer.analyze_panco(methods, netfile, use_tfa, use_sfa)
 ```
 Analyze the network with `panco`. All parameters are optional:
-- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 - `methods`: A list of strings or a string specifying the analysis method. For the available values please refer to [Tool Specification](#tool-specification).
+- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 - `use_tfa`/`use_sfa`: Boolean variables to select whether to use TFA/SFA bounds for improving PLP bounds. Only relevant when using PLP. Default is both `True`.
 
 ### analyze_dnc
 ```
-analyzer.analyze_panco(netfile, methods, )
+analyzer.analyze_panco(methods, netfile)
 ```
 Analyze the network with `DNC`. All parameters are optional:
-- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 - `methods`: A list of strings or a string specifying the analysis method. For the available values please refer to [Tool Specification](#tool-specification).
+- `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 
 ### export
 ```
-analyzer.export(default_name, json_output, report_file)
+analyzer.export(default_name, result_json, report_md, clear)
 ```
 Write the JSON result and Markdown report at the same time. All parameters are optional:
-- `default_name`: The default file name stem if either `json_output` or `report_file` are not assigned or `None`. For example,
+- `default_name`: The default file name stem if either `result_json` or `report_md` are not assigned or `None`. For example,
     ```
     analyzer.export("test")
     ```
     writes 2 files: `test_data.json` and `test_report.md`.
-- `json_output`: The file name of the JSON output
-- `report_file`: The file name of the Markdown report
+- `result_json`: The file name of the JSON output
+- `report_md`: The file name of the Markdown report
+- `clear`: Boolean deciding whether to clear the analyzer after finishing writing. Default is `True`.
 
 ### write_result_json
 ```
@@ -530,7 +533,7 @@ All 3 methods take the same parameters:
 - `latency`: Latency of each server.
 - `service_rate`: Service rate of each server.
 - `capacity`: The transmission capacity of each server.
-- `dir`: (Optional) The output file to store the generated network. Default is `None`, which is not writing the network to file, but return a dictionary of all information instead (the dictionary as loaded from a `.json` file.)
+- `save_dir`: (Optional) The output file to store the generated network. Default is `None`, which is not writing the network to file, but return a dictionary of all information instead (the dictionary as loaded from a `.json` file.)
 
 ### Random Network with Fixed Topology
 One can also generate a random network from a fixed topology.
@@ -553,7 +556,7 @@ connections = {
 generate_fix_topology_network(num_flows=30, connections=connections,
                               burst="10B", arrival_rate=("200bps", "20kbps"), max_packet_length="6kB",
                               latency=("2us", "200ms"), service_rate=("1Mbps", "50Mbps"), capacity="100Mbps",
-                              dir="rand_net.json",
+                              save_dir="rand_net.json",
                               link_prob=0.9)
 ```
 The above code generates 30 flows within the given topology, and dump the output port network as `rand_net.json`. Note that the flow/server parameters can be decided randomly or deterministically. The above example shows that for `burst` it's a constant `"10B"` (10 Bytes) whereas other parameters are decided uniform-randomly among a (min, max) value pair.
@@ -595,7 +598,7 @@ The above code generates 30 flows within the given topology, and dump the output
 - `network_attrib`: (Optional) Additinoal network information. Default is empty
 - `server_attrib`: (Optional) Additinoal server information. Default is empty
 - `flow_attrib`: (Optional) Additinoal flow information. Default is empty
-- `dir`: (Optional) path to dump the generated file as a json output-port network. Default is `None`, where no file will be dumped
+- `save_dir`: (Optional) path to dump the generated file as a json output-port network. Default is `None`, where no file will be dumped
 - `link_prob`: (Optional) probability $p$ to continue finding next switch, otherwise directly go to a sink. Default is `0.9`
 - `rand_seed`: (Optional) random seed to feed to python `random` library. Default is `None` (random seed by time)
 
@@ -688,7 +691,7 @@ generate_ring(size=10,
               latency=1,
               service_rate=20,
               capacity=20,
-              dir="./ring.json")
+              save_dir="./ring.json")
 analyzer = TSN_Analyzer("./ring.json", temp_path="./temp/", use_shaper="AUTO")
 analyzer.analyze_all()
 analyzer.write_report_md("./ring_report.md")

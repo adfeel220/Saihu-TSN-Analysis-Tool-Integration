@@ -10,7 +10,7 @@ from unit_util import *
 # Generate certain type of network #
 ####################################
 
-def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, save_dir:str=None) -> dict:
     '''
     Generate an interleave tandem with all arrival/service curves being identical.
     An interleave tandem network is a chain topology,
@@ -33,7 +33,7 @@ def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_pa
     service_rate : service rate
     capacity     : server output capacity, unit in bps
     
-    dir: directory to dump the generated json file. If it's None, no file will be dumped.
+    save_dir: directory to dump the generated json file. If it's None, no file will be dumped.
 
     Returns:
     --------------
@@ -86,8 +86,8 @@ def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_pa
         "flows": flows,
         "servers": servers
     }
-    if dir is not None:
-        with open(dir, "w") as ofile:
+    if save_dir is not None:
+        with open(save_dir, "w") as ofile:
             json.dump(network, ofile, indent=4)
 
     print("Done")
@@ -96,7 +96,7 @@ def generate_interleave_tandem(size:int, burst:float, arrival_rate:float, max_pa
 
 
 
-def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, save_dir:str=None) -> dict:
     '''
     Generate a ring with all arrival/service curves being identical.
     An interleave tandem network is a chain topology,
@@ -123,7 +123,7 @@ def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:f
     service_rate: service rate
     capacity: server capacity
     
-    dir: directory to dump the generated json file. If it's None, no file will be dumped.
+    save_dir: directory to dump the generated json file. If it's None, no file will be dumped.
     '''
     print(f"Generating a ring network of {size} servers...", end='')
 
@@ -162,8 +162,8 @@ def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:f
         "flows": flows,
         "servers": servers
     }
-    if dir is not None:
-        with open(dir, "w") as ofile:
+    if save_dir is not None:
+        with open(save_dir, "w") as ofile:
             json.dump(network, ofile, indent=4)
 
     print("Done")
@@ -172,7 +172,7 @@ def generate_ring(size:int, burst:float, arrival_rate:float, max_packet_length:f
 
 
 
-def generate_mesh(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, dir:str=None) -> dict:
+def generate_mesh(size:int, burst:float, arrival_rate:float, max_packet_length:float, latency:float, service_rate:float, capacity:float, save_dir:str=None) -> dict:
     '''
     Generate a mesh network, which has the topology
     ------   ------      --------
@@ -276,8 +276,8 @@ def generate_mesh(size:int, burst:float, arrival_rate:float, max_packet_length:f
         "flows": flows,
         "servers": servers
     }
-    if dir is not None:
-        with open(dir, "w") as ofile:
+    if save_dir is not None:
+        with open(save_dir, "w") as ofile:
             json.dump(network, ofile, indent=4)
 
     print("Done")
@@ -324,7 +324,7 @@ def generate_fix_topology_network(num_flows:int,
                                   network_attrib:dict=dict(),
                                   server_attrib:dict=dict(),
                                   flow_attrib:dict=dict(),
-                                  dir:str=None,
+                                  save_dir:str=None,
                                   link_prob:float=0.9,
                                   rand_seed:int=None) -> dict:
     '''
@@ -366,7 +366,7 @@ def generate_fix_topology_network(num_flows:int,
     - network_attrib `dict` : (optional) Additinoal network information. Default is empty
     - server_attrib `dict`  : (optional) Additinoal server information. Default is empty
     - flow_attrib `dict`    : (optional) Additinoal flow information. Default is empty
-    - dir `str` : (optional) path to dump the generated file as a json output-port network. Default is None, where no file will be dumped
+    - save_dir `str` : (optional) path to dump the generated file as a json output-port network. Default is None, where no file will be dumped
     - link_prob `float` : (optional) probability p to continue finding next switch, otherwise directly go to a sink. Default is 0.9
     - rand_seed `int` : (optional) random seed to feed to python `random` library. Default is None (random seed by time)
 
@@ -389,7 +389,7 @@ def generate_fix_topology_network(num_flows:int,
     >>> net = generate_fix_topology_network(num_flows=30, connections=connections,
                 burst=("10B", "500B"), arrival_rate=("200bps", "20kbps"), max_packet_length="6kB",
                 latency=("2us", "200ms"), service_rate=("1Mbps", "50Mbps"), capacity="100Mbps",
-                dir="test.json",
+                save_dir="test.json",
                 link_prob=0.9)
     '''
     assert num_flows >= 1
@@ -411,6 +411,10 @@ def generate_fix_topology_network(num_flows:int,
     next_input_port.update(zip([f"sk{i}" for i in range(1, max_out_end_stations+1)], [1]*max_out_end_stations))
 
     network = deepcopy(network_attrib)
+    # default name priority 1: file name
+    if save_dir is not None:
+        network.setdefault("name", save_dir.rsplit('.', 1)[0])
+    # default name priority 2: number of flows and number of switches
     network.setdefault("name", f"NONAME-F{num_flows}-SW{NUM_SWITCHES}")
     network.setdefault("multiplexing", "FIFO")
 
@@ -494,8 +498,8 @@ def generate_fix_topology_network(num_flows:int,
     }
 
     # output dump file
-    if dir is not None:
-        with open(dir, 'w') as ofile:
+    if save_dir is not None:
+        with open(save_dir, 'w') as ofile:
             json.dump(dump_file, ofile, indent=4)
 
     print("Done")

@@ -94,13 +94,13 @@ class Flow:
         f = cls()
         # pop name and packet lengths to avoid duplicate information to be stored
         f.name = localD.pop("name")
-        f.maxPacketLength = unitUtility.readDataUnit(localD.pop("max-payload","1500B"))
+        f.maxPacketLength = unitUtility.readDataUnit(localD.pop("max-payload","1B"))
         f.minPacketLength = unitUtility.readDataUnit(localD.pop("min-payload","0"))
         #add overhead
         f.maxPacketLength += unitUtility.readDataUnit(localD.pop("overhead","16B"))
         f.minPacketLength += unitUtility.readDataUnit(localD.pop("overhead","16B"))
         #minimum 64 bytes
-        f.maxPacketLength = max(f.maxPacketLength, unitUtility.readDataUnit(localD.pop("minimum-packet-size","64B")))
+        f.maxPacketLength = max(f.maxPacketLength, unitUtility.readDataUnit(localD.pop("maximum-packet-size","64B")))
         f.minPacketLength = max(f.minPacketLength, unitUtility.readDataUnit(localD.pop("minimum-packet-size","64B")))
         f.trafficClass = unitUtility.readPriority(localD.pop("priority","0"))
         if(localD.pop("arrival-curve","") == "leaky-bucket"):

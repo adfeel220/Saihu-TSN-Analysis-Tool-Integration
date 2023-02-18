@@ -259,7 +259,7 @@ class NetworkScriptHandler:
         flows = []
         for fl_name, fl_data in self.phy_net.flows.items():
             attrib = fl_data["attrib"]
-            if attrib["arrival-curve"] != "leaky-bucket":
+            if attrib.get("arrival-curve", "") != "leaky-bucket":
                 raise NotImplementedError("The format currently only supports leaky-bucket arrival curves")
 
             arrival_curve = {
@@ -568,8 +568,12 @@ class NetworkScriptHandler:
         utilities : [dict] utilities of all servers, key=server name ; value=utility
         '''
         if filename.endswith(".xml"):
-            network_def = self.phynet_to_opnet_json(filename)
-            opnet = OutputPortNet(network_def=network_def)
+            try:
+                network_def = self.phynet_to_opnet_json(filename)
+                opnet = OutputPortNet(network_def=network_def)
+            except Exception as e:
+                print("Getting error while getting network utility:\n -> {0}".format(e))
+                opnet = OutputPortNet()
         elif filename.endswith(".json"):
             opnet = OutputPortNet(ifile=filename)
         else:

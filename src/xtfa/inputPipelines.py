@@ -255,6 +255,10 @@ class FlowsPartition:
 
     def addPacketizationEffect(self, linkSpeedDictionnary: Mapping[Tuple[str,str],float]) -> None:
         for el in self.partitionElements:
+            if el.aggregateShaping is None:
+                el.aggregateShaping = mpt.LeakyBucket(0.0, el.getMaxPacketLengthInPartitionElement())
+                continue
+
             #retrieve the incoming edge associated with this partition element: take the one of the first flow in the partition element, they are all the same since we used partition.breakPartitionByIncomingEdge() beforehand
             if(el.flows[0].atEdge in linkSpeedDictionnary.keys()):
                 #link speed known, tighter result

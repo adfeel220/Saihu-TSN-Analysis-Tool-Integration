@@ -270,8 +270,8 @@ class PhysicalNet:
                 if lk["dest"] == dest:
                     return lk["output_port"]
 
-        except KeyError as ke:
-            raise xml.etree.ElementTree.ParseError(f"Unable to resolve port from {src}->{dest}, no links coming out of {src}")
+        except KeyError:
+            raise xml.etree.ElementTree.ParseError(f"Unable to resolve port from {src}->{dest}, no links coming out of {src} with destination {dest}")
 
         return None
 
@@ -433,7 +433,10 @@ class OutputPortNet:
                 self.adjacency_mat[path_in_idx[sid], path_in_idx[sid+1]] = 1
 
             ## Check arrival curve syntax
-            arrival_curve = fl["arrival_curve"]
+            default_arrival_curve = network_def["network"].get("arrival_curve", None)
+            arrival_curve = fl.get("arrival_curve", default_arrival_curve)
+            if arrival_curve is None:
+                raise ValueError(f"No arrival curve found for flow {flow_name}")
             # Get local unit
             unit = {
                 "time": fl.pop("time_unit", default_units["time"]),
@@ -493,7 +496,10 @@ class OutputPortNet:
             }
             
             # assertion of arrival curve definition
-            service_curve = ser["service_curve"]
+            default_service_curve = network_def["network"].get("service_curve", None)
+            service_curve = ser.get("service_curve", default_service_curve)
+            if service_curve is None:
+                raise ValueError(f"No service curve found for server {ser_name}")
 
             # Convert service curve to the default unit
             service_curve["latencies"] = try_raise(f"Parsing servers.service_curve.latencies of \"{ser_name}\"", service_curve["latencies"], self._convert_unit, service_curve["latencies"], unit["time"], "time")
