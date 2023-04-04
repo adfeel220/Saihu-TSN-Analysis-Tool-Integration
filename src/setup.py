@@ -1,16 +1,12 @@
-from setuptools import setup, find_packages
-
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+from setuptools import setup
 
 setup(
     name="saihu",
     version="1.0.0",
     author="Chun-Tso Tsai",
     author_email="chun-tso.tsai@epfl.ch",
-    license="BSD",
+    license="MIT",
     description="Saihu Common Interface for Worst-Case Delay Analysis of Time-Sensitive Networks",
-    long_description=long_description,
     packages=[
         "saihu",
         "saihu.panco",
