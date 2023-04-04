@@ -4,47 +4,76 @@ Author: Chun-Tso Tsai
 
 Advisors: Seyed Mohammadhossein Tabatabaee, Stéphan Plassart, Jean-Yves Le Boudec
 
-Date: 2023-01-12
-
 Institute: Computer Communications and Applications Laboratory 2 (LCA2), École Polytechnique Fédérale de Lausane (EPFL)
 
 Table of Contents
 ========================
-* [Introduction](#introduction)
-    * [Pipeline](#pipeline)
-    * [Credit](#credit)
-* [Project Structure](#project-structure)
-    * [File Description](#file-description)
-    * [Credits to Files](#credits-to-files)
-* [Installation](#installation)
-    * [Requirements](#requirements)
-    * [Dependencies](#dependencies)
-* [How to Use This Tool](#how-to-use)
-    * [Network Description File](#network-description-file)
-        * [Network Definition](#network-definition)
-        * [Physical Network](#physical-network)
-        * [Output-Port Network](#output-port-network)
-    * [Analysis Tools](#analysis-tools)
-        * [Tool Specification](#tool-specification)
-        * [Public Methods](#public-methods)
-    * [Network Generation](#network-generation)
-        * [Certain Network Type](#certain-network-type)
-        * [Random Network with Fixed Topology](#random-network-with-fixed-topology)
-* [Example](#example)
-    * [Specific Tool](#specific-tool)
-    * [Selecting Shaper](#selecting-shaper)
-    * [Specific Networks](#specific-networks)
-    * [Generate Network and Analysis](#generate-network-and-analysis)
-* [Extend this Project](#extend-this-project)
-    * [Files](#files)
-    * [Standard Analysis Result](#standard-analysis-result)
-* [Contact](#contact)
+- [Saihu: A Common Interface for Worst-Case Delay Analysis of Time-Sensitive Networks](#saihu-a-common-interface-for-worst-case-delay-analysis-of-time-sensitive-networks)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+  - [Cite this project](#cite-this-project)
+  - [Pipeline](#pipeline)
+  - [Credit](#credit)
+- [Project Structure](#project-structure)
+  - [File description](#file-description)
+  - [Credits to Files](#credits-to-files)
+- [Installation](#installation)
+  - [Requirements](#requirements)
+  - [Dependencies](#dependencies)
+- [How to Use](#how-to-use)
+  - [Network Description File](#network-description-file)
+    - [Network Definition](#network-definition)
+    - [Physical Network](#physical-network)
+    - [Output-Port Network](#output-port-network)
+  - [Analysis Tools](#analysis-tools)
+    - [Tool Specification](#tool-specification)
+    - [Public Methods](#public-methods)
+    - [Init](#init)
+    - [set\_shaping\_mode](#set_shaping_mode)
+    - [convert\_netfile](#convert_netfile)
+    - [analyze\_all](#analyze_all)
+    - [analyze\_xtfa](#analyze_xtfa)
+    - [analyze\_linear](#analyze_linear)
+    - [analyze\_panco](#analyze_panco)
+    - [analyze\_dnc](#analyze_dnc)
+    - [export](#export)
+    - [write\_result\_json](#write_result_json)
+    - [write\_report\_md](#write_report_md)
+    - [clear](#clear)
+  - [Network Generation](#network-generation)
+    - [Certain Network Type](#certain-network-type)
+    - [Random Network with Fixed Topology](#random-network-with-fixed-topology)
+- [Example](#example)
+  - [Specific Tools](#specific-tools)
+  - [Selecting Shaper](#selecting-shaper)
+  - [Specific Networks](#specific-networks)
+    - [Late assignment of network](#late-assignment-of-network)
+    - [Multiple networks](#multiple-networks)
+    - [Incorrect type of network](#incorrect-type-of-network)
+  - [Generate Network and Analysis](#generate-network-and-analysis)
+- [Extend this Project](#extend-this-project)
+  - [Files](#files)
+  - [Standard Analysis Result](#standard-analysis-result)
+- [Contact](#contact)
 
 
 # Introduction
 **Time-Sensitive Networking (TSN)** analysis focuses on giving deterministic delay or backlog guarantees. This project integrates 4 different TSN analysis tools, including `Linear TFA Solver`, [NetCal/DNC](https://github.com/NetCal/DNC), [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa), and [panco](https://github.com/Huawei-Paris-Research-Center/panco). The users can use a common interface to compute network delay bounds obtained by different tools, and write the results into a formated report. All these actions requires only a few lines of code.
 
 The name **SAIHU** comes from **S**uperimposed worst-case delay **A**nalysis **I**nterface for **H**uman-friendly **U**sage." It’s also inspired by the Taiwanese word ‘師傅 (sai-hū)’, which means a master, an expert, or a qualified worker.
+
+## Cite this project
+This repo is the official implementation of [Saihu: A Common Interface of Worst-Case Delay Analysis Tools for Time-Sensitive Networks](https://doi.org/10.48550/arXiv.2303.14565). To cite this project, please use the following information
+```bibtex
+@misc{tsai2023saihu,
+      title={Saihu: A Common Interface of Worst-Case Delay Analysis Tools for Time-Sensitive Networks}, 
+      author={Chun-Tso Tsai and Seyed Mohammadhossein Tabatabaee and Stéphan Plassart and Jean-Yves Le Boudec},
+      year={2023},
+      eprint={2303.14565},
+      archivePrefix={arXiv},
+      primaryClass={cs.NI}
+}
+```
 
 ## Pipeline
 Below states the pipeline and structure of Saihu.
@@ -59,7 +88,7 @@ Here are the authors that implemented the individual tools used in this project.
 - `xTFA`: This tool is implemented in `Python` by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en).
 - `NetCal/DNC`: This tool is implemented in `JAVA` by the NetCal team. You can visit [their repository](https://github.com/NetCal/DNC) and here are the academic references:
     - Arbitrary Multiplexing:
-    ```
+    ```bibtex
     @inproceedings{DiscoDNCv2,
         author    = {Steffen Bondorf and Jens B. Schmitt},
         title     = {The {DiscoDNC} v2 -- A Comprehensive Tool for Deterministic Network Calculus},
@@ -72,7 +101,7 @@ Here are the authors that implemented the individual tools used in this project.
     }
     ```
     - FIFO Multiplexing:
-    ```
+    ```bibtex
     @inproceedings{LUDBFF,
         author    = {Alexander Scheffler and Steffen Bondorf},
         title     = {Network Calculus for Bounding Delays in Feedforward Networks of {FIFO} Queueing Systems},
@@ -283,7 +312,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     - `target`: Each target is a path, can assign a `name` to it. A list of nodes is written as its sub-element-tree. Each node is specified by a `path` entry with attribute `node` equals to a station/switch.
 
     Example:
-    ```
+    ```xml
     <flow name="f0" arrival-curve="leaky-bucket" lb-burst="1b" lb-rate="1" source="st-0">
         <target name="p1">
             <path node="sw0"/>
@@ -303,7 +332,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
 ### Output-Port Network
 An Output-port network is defined as a `.json` file. It contains only one `JSON Object` with the following attributes:
 - `network`: General network information, for example
-    ```
+    ```json
     "network": {
         "name": "my network",
         "multiplexing": "FIFO",    // or "ARBITRARY"
@@ -359,23 +388,23 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
 ## Analysis Tools
 ### Tool Specification
 - Available method for tools
-    | Method\Tool | DNC | xTFA | Panco | Linear TFA |
-    | :--: | :-: | :--: | :---: | :----: |
-    | **TFA** | V | V | V | V |
-    | **SFA** | V |   | V |   |
-    | **PLP** |   |   | V |   |
-    | **ELP** |   |   | V |   |
-    | **PMOO** | V |
-    | **TMA** | V |
+    | Method\Tool |  DNC  | xTFA  | Panco | Linear TFA |
+    | :---------: | :---: | :---: | :---: | :--------: |
+    |   **TFA**   |   V   |   V   |   V   |     V      |
+    |   **SFA**   |   V   |       |   V   |            |
+    |   **PLP**   |       |       |   V   |            |
+    |   **ELP**   |       |       |   V   |            |
+    |  **PMOO**   |   V   |
+    |   **TMA**   |   V   |
 
     Note: TMA stands for Tandem Matching Analysis
     
 - Constraints
-    | Spec\Tool | DNC | xTFA | Panco | Linear TFA |
-    | :--: | :-: | :--: | :---: | :----: |
-    | **Manual Tune Shaping** |  | V | V | V |
-    | **Cyclic Dependent Network**   |  | V | V | V |
-    | **Multicast Flow** | | V | |
+    |          Spec\Tool           |  DNC  | xTFA  | Panco | Linear TFA |
+    | :--------------------------: | :---: | :---: | :---: | :--------: |
+    |   **Manual Tune Shaping**    |       |   V   |   V   |     V      |
+    | **Cyclic Dependent Network** |       |   V   |   V   |     V      |
+    |      **Multicast Flow**      |       |   V   |       |
 
     Note: 
     1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 
@@ -570,7 +599,7 @@ The above code generates 30 flows within the given topology, and dump the output
 **Parameters**
 - `num_flows`: number of flows to be generated in the network
 - `connections`: possible connections between switches. key=name of switch; value=list of switch's name that "key" can connect to. e.g.
-    ```
+    ```python
     connections = {
         "s1": ["s2", "s3"],
         "s2": ["s3"],
@@ -611,7 +640,7 @@ The above code generates 30 flows within the given topology, and dump the output
 
 # Example
 You may check [example.py](./example/example.py) for the simple example. Here I present the basic usage.
-```
+```python
 import sys
 import os.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/")))
@@ -626,7 +655,7 @@ if __name__ == "__main__":
 
 ## Specific Tools
 While `analyze_all` tries all possible tools, you may also specify which tool you want to use. For example,
-```
+```python
 analyzer = TSN_Analyzer("./demo.json")
 analyzer.analyze_panco(methods=["TFA", "PLP"])
 analyzer.analyze_dnc(methods="TFA")
@@ -635,7 +664,7 @@ analyzer.export("panco_dnc")     # Containing both panco and DNC results
 Note that any function called `analyze_xxx` only puts the result into the analyzer's internal buffer. When you call `export`/`write_result_json`/`write_report_md`, it simply takes all the stored results and write them into the report. Under default setting, the buffer is cleaned after writing results.
 
 You can also choose to not clearing the result buffer after writing a report.
-```
+```python
 analyzer = TSN_Analyzer("./demo.json")
 analyzer.analyze_panco(methods=["TFA", "PLP"])
 analyzer.export("panco", clear=False) # Write panco results
@@ -647,7 +676,7 @@ analyzer.export("panco_dnc") # Write results including both panco and DNC
 
 ## Selecting Shaper
 You may change shaper selection any time you want.
-```
+```python
 analyzer = TSN_Analyzer("./demo.json", use_shaper="ON")
 analyzer.analyze_panco(methods=["TFA", "PLP"]) # Analysis with shaper
 analyzer.set_shaper_usage("OFF")               # Turn off using shaper
@@ -658,14 +687,14 @@ analyzer.write_report_md("./demo_report.md")      # panco TFA & PLP is with shap
 ## Specific Networks
 ### Late assignment of network
 You may assign different networks every time you want to analyze.
-```
+```python
 analyzer = TSN_Analyzer()
 analyzer.analyze_linear(netfile="./demo.json")
 analyzer.write_report_md("./linear_report.md")
 ```
 ### Multiple networks
 When there are multiple networks (different network names defined in `network` attributes of description files), the program generate multiple reports for each network. The extra report files are named by adding index to the original file. For example,
-```
+```python
 analyzer = TSN_Analyzer("./demo.xml", temp_path="./temp/", use_shaper="AUTO")
 analyzer.analyze_all(methods=["TFA", "PLP"]) # Analyze "demo.xml"
 analyzer.analyze_linear("./mesh.json")       # Analyze "mesh.json"
@@ -676,7 +705,7 @@ However, I suggest users to manually write each result when needed because the s
 
 ### Incorrect type of network
 The interface automatically converts the network description file when the input file is not in the right format for the tool. The desired input format for `xTFA` is physical network and all other tools take output-port network.
-```
+```python
 analyzer = TSN_Analyzer("./demo.xml", temp_path="./temp/", use_shaper="AUTO")
 analyzer.analyze_linear()
 analyzer.write_report_md("./report.md")
@@ -686,7 +715,7 @@ The above analysis still gives the report although `linear TFA solver` should ta
 ## Generate Network and Analysis
 You can use the network generation functions to generate the following 3 types of networks `interleave tandem`, `ring`, and `mesh`. About their topology and how the flows are assigned, please see [Network Generation](#network-generation).
 Say you would like to generate a ring network of 10 servers, you can do the following.
-```
+```python
 from interface import TSN_Analyzer
 from netscript.net_gen import *
 
