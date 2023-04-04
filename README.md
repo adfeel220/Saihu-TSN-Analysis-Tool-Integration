@@ -134,11 +134,10 @@ Here are the authors that implemented the individual tools used in this project.
 # Project Structure
 ```
 .
-└- interface.py
-└- result.py
-└- environment.yml
 └- README.md
-└- example
+└- tool-usage.md
+└- LICENSE.txt
+└- example/
 │  └- example.py
 │  └- demo.json
 │  └- demo.xml
@@ -147,8 +146,8 @@ Here are the authors that implemented the individual tools used in this project.
 │  └- temp
 │     └- ... (execution artifacts)
 │
-└- src
-   └- javapy
+└- saihu
+   └- javapy/
    │  └- dnc_analysis.jar
    │  └- dnc_exe.py
    │  └- NetworkAnalysis
@@ -156,27 +155,33 @@ Here are the authors that implemented the individual tools used in this project.
    │     └- NetworkScriptHandler.java
    │     └- NetworkAnalysis.java
    │
-   └- Linear_TFA
+   └- Linear_TFA/
    │  └- Linear_TFA.py
    │  └- ...
    │
-   └- xTFA
+   └- xTFA/
    │  └- ...
    │
-   └- panco
+   └- panco/
    │  └- lp_solve
    │  └- lpSolvePath.py
    │  └- panco_analyzer.py
    │  └- ...
-   └- netscript
-      └- netdef.py
-      └- netscript.py
-      └- net_gen.py
-      └- unit_util.py
+   └- netscript/
+   │  └- netdef.py
+   │  └- netscript.py
+   │  └- net_gen.py
+   │  └- unit_util.py
+   └- interface.py
+   └- result.py
+   └- environment.yml
+   └- setup.py
 ```
 ## File description
 - `interface.py`: The general interface to use the analysis tools. Generally speaking, user can only import function from here to access all functionalities.
 - `result.py`: The formated result class from all tools.
+- `setup.py`: Python package installation.
+- `enviornments.yml`: Python environment requirements.
 - `example/`:
     - `example.py`: Example on how to use it.
     - `demo.json`: A demo network definition file in output-port json format. (more detail in [Output Port Network](#output-port-network))
@@ -207,6 +212,7 @@ Here are the authors that implemented the individual tools used in this project.
         - `net_gen.py`: Methods to automatically generate interleave/ring/mesh network with arbitrary number of homogeneous servers.
         - `unit_util.py`: Methods to do multiplier/unit parsing and manipulation.
 - `README.md`: This `README`
+- `tool-usage.md`: Brief description of the included tools.
 
 ## Credits to Files
 - `NetCal/DNC`: The file `dnc_analysis.jar` is built based on the project [DNC](https://github.com/NetCal/DNC). I only implemented `NetworkAnalysis` package to allow analysing with `DNC` while using my network description file as input and my standard result format as output. More you can find more details about my input/output at [network description file](#network-description-file) and [standard result](#standard-analysis-result).
@@ -641,11 +647,7 @@ The above code generates 30 flows within the given topology, and dump the output
 # Example
 You may check [example.py](./example/example.py) for the simple example. Here I present the basic usage.
 ```python
-import sys
-import os.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/")))
-
-from interface import TSN_Analyzer
+from saihu.interface import TSN_Analyzer
 
 if __name__ == "__main__":
     analyzer = TSN_Analyzer("./demo.json", temp_path="./temp/", use_shaper="AUTO")
@@ -716,8 +718,8 @@ The above analysis still gives the report although `linear TFA solver` should ta
 You can use the network generation functions to generate the following 3 types of networks `interleave tandem`, `ring`, and `mesh`. About their topology and how the flows are assigned, please see [Network Generation](#network-generation).
 Say you would like to generate a ring network of 10 servers, you can do the following.
 ```python
-from interface import TSN_Analyzer
-from netscript.net_gen import *
+from saihu.interface import TSN_Analyzer
+from saihu.netscript.net_gen import *
 
 generate_ring(size=10,
               burst=1,
