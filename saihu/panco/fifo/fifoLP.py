@@ -40,11 +40,23 @@ def edges_forest(network: Network):
             if k > i:
                 j = min(k, j)
         sf[i] = j
-    return [(i, sf[i]) for i in range(network.num_servers) if not sf[i] == network.num_servers]
+    return [
+        (i, sf[i])
+        for i in range(network.num_servers)
+        if not sf[i] == network.num_servers
+    ]
 
 
 class FifoLP:
-    def __init__(self, network: Network, list_edges=None, polynomial=True, sfa=False, tfa=False, filename="fifo.lp"):
+    def __init__(
+        self,
+        network: Network,
+        list_edges=None,
+        polynomial=True,
+        sfa=False,
+        tfa=False,
+        filename="fifo.lp",
+    ):
         """
         Constructor for the class FifoLP, for the analysis of a network with the linear programming methods.
         The network is decomposed into a forest (self.forest)
@@ -99,15 +111,19 @@ class FifoLP:
         :param file: the file where the linear program is written
         :return: None
         """
-        file.write('max: ')
+        file.write("max: ")
         for i in range(self.forest.num_flows):
-            file.write('+ x{}'.format(i))
-        file.write(';\n\n')
+            file.write("+ x{}".format(i))
+        file.write(";\n\n")
         i = 0
         f = 0
         while i < self.forest.num_flows:
             if i == self.list_first[f]:
-                file.write('x{0} = {1};\n'.format(i, self.network.flows[f].arrival_curve[0].sigma))
+                file.write(
+                    "x{0} = {1};\n".format(
+                        i, self.network.flows[f].arrival_curve[0].sigma
+                    )
+                )
             else:
                 self.lp_constraint_flow(i - 1, file)
             i += 1
@@ -120,15 +136,20 @@ class FifoLP:
         Writes the linear program and solves it to obtain the unknown burst where the flows have been cut
         :return: the list of bursts of flows in the forest
         """
-        file = open(self.filename, 'w')
+        file = open(self.filename, "w")
         self.lp_constraints(file)
         file.close()
-        s = sp.run(LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding='utf-8').stdout
-        tab_values = s.split('\n')[4:-1]
-        values = [[token for token in line.split(' ') if not token == ""] for line in tab_values]
+        s = sp.run(
+            LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding="utf-8"
+        ).stdout
+        tab_values = s.split("\n")[4:-1]
+        values = [
+            [token for token in line.split(" ") if not token == ""]
+            for line in tab_values
+        ]
         tab_bursts = np.zeros(self.forest.num_flows)
         for [s1, s2] in values:
-            if s1[0] == 'x':
+            if s1[0] == "x":
                 tab_bursts[int(float(s1[1:]))] = float(s2)
         return tab_bursts
 
@@ -139,7 +160,9 @@ class FifoLP:
         for j in list_flows:
             if sigma[j] == np.inf:
                 sigma = self.update_sigma(j, sigma)
-        sigma[f] = TreeLP(sub_net, new_f, self.polynomial, self.sfa, self.tfa, self.filename).backlog
+        sigma[f] = TreeLP(
+            sub_net, new_f, self.polynomial, self.sfa, self.tfa, self.filename
+        ).backlog
         self.forest.flows[f].arrival_curve[0].sigma = sigma[f]
         return sigma
 
@@ -184,7 +207,9 @@ class FifoLP:
         d = 0
         while i < ff.num_flows:
             tree, foi, list_flows, list_servers = ff.sub_network(i)
-            d += TreeLP(tree, foi, self.polynomial, self.sfa, self.tfa, "fifoLP_delay.lp").delay
+            d += TreeLP(
+                tree, foi, self.polynomial, self.sfa, self.tfa, "fifoLP_delay.lp"
+            ).delay
             i += 1
             if i in self.list_first:
                 tab_delays += [d]
@@ -201,9 +226,17 @@ class FifoLP:
         ff = self.ff_equiv
         i = self.list_first[foi]
         delay = 0
-        while (foi < self.network.num_flows - 1 and i < self.list_first[foi + 1]) or \
-              (foi == self.network.num_flows - 1 and i < ff.num_flows):
+        while (foi < self.network.num_flows - 1 and i < self.list_first[foi + 1]) or (
+            foi == self.network.num_flows - 1 and i < ff.num_flows
+        ):
             tree, foi1, list_flows, list_servers = ff.sub_network(i)
-            delay += TreeLP(tree, foi1, self.polynomial, self.sfa, self.tfa, filename="fifoLP_delay.lp").delay
+            delay += TreeLP(
+                tree,
+                foi1,
+                self.polynomial,
+                self.sfa,
+                self.tfa,
+                filename="fifoLP_delay.lp",
+            ).delay
             i += 1
         return delay

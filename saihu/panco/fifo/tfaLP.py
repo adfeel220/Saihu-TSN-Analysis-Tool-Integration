@@ -33,6 +33,7 @@ class TfaLP:
     :param network: the network to analyse.
     :param filename: name of the file to write the linear program
     """
+
     def __init__(self, network: Network, filename="tfa.lp"):
         self.network = network
         self.filename = filename
@@ -43,14 +44,24 @@ class TfaLP:
         :param file: the file in which the constraints are written
         :return: None
         """
-        file.write('\n /* sigma variables*/\n')
+        file.write("\n /* sigma variables*/\n")
         for i in range(self.network.num_flows):
             for (l, j) in enumerate(self.network.path[i]):
                 if j == self.network.path[i][0]:
-                    file.write('x{0}s{1} = {2};\n'.format(i, j, self.network.flows[i].arrival_curve[0].sigma))
+                    file.write(
+                        "x{0}s{1} = {2};\n".format(
+                            i, j, self.network.flows[i].arrival_curve[0].sigma
+                        )
+                    )
                 else:
-                    file.write('x{0}s{1} <= x{0}s{2} + {3} d{2};\n'.format(i, j, self.network.path[i][l - 1],
-                                                                           self.network.flows[i].arrival_curve[0].rho))
+                    file.write(
+                        "x{0}s{1} <= x{0}s{2} + {3} d{2};\n".format(
+                            i,
+                            j,
+                            self.network.path[i][l - 1],
+                            self.network.flows[i].arrival_curve[0].rho,
+                        )
+                    )
 
     def tfa_constraints_server(self, file):
         """
@@ -59,38 +70,44 @@ class TfaLP:
         :return: None
         """
         for j in range(self.network.num_servers):
-            file.write('\n /* server {0}*/\n'.format(j))
+            file.write("\n /* server {0}*/\n".format(j))
             for i in self.network.flows_in_server[j]:
                 tb = self.network.flows[i].arrival_curve[0]
-                file.write('f{0}s{1}u{1} <= x{0}s{1} + {2} u{1};\n'.format(i, j, tb.rho))
+                file.write(
+                    "f{0}s{1}u{1} <= x{0}s{1} + {2} u{1};\n".format(i, j, tb.rho)
+                )
             for h in self.network.predecessors[j]:
                 for tb in self.network.servers[h].max_service_curve:
                     for i in self.network.edges[(h, j)]:
-                        file.write('+ f{0}s{1}u{1}'.format(i, j))
-                    file.write('<= {0} + {1} u{2};\n'.format(tb.sigma, tb.rho, j))
+                        file.write("+ f{0}s{1}u{1}".format(i, j))
+                    file.write("<= {0} + {1} u{2};\n".format(tb.sigma, tb.rho, j))
             file.write("0")
             for i in self.network.flows_in_server[j]:
-                file.write('+ f{0}s{1}u{1}'.format(i, j))
-            file.write('= a{0}u{0};\n'.format(j))
+                file.write("+ f{0}s{1}u{1}".format(i, j))
+            file.write("= a{0}u{0};\n".format(j))
             for rl in self.network.servers[j].service_curve:
-                file.write('b{0}t{0} >= {1} t{0} - {2};\n'.format(j, rl.rate, rl.rate * rl.latency))
-            file.write('b{0}t{0} >= 0;\n'.format(j))
-            file.write('b{0}t{0} = a{0}u{0};\n'.format(j))
-            file.write('d{0} = t{0} - u{0};\n'.format(j))
-            file.write('d{0} >= 0;\n'.format(j))
+                file.write(
+                    "b{0}t{0} >= {1} t{0} - {2};\n".format(
+                        j, rl.rate, rl.rate * rl.latency
+                    )
+                )
+            file.write("b{0}t{0} >= 0;\n".format(j))
+            file.write("b{0}t{0} = a{0}u{0};\n".format(j))
+            file.write("d{0} = t{0} - u{0};\n".format(j))
+            file.write("d{0} >= 0;\n".format(j))
 
         for k in range(len(self.network.arrival_shaping)):
             j = self.network.arrival_shaping[k][0]
             max_service = self.network.arrival_shaping[k][2]
             for i in self.network.arrival_shaping[k][1]:
                 if not j == self.network.path[i][0]:
-                    print('error in shaping constraints', j, self.network.path[i][0])
+                    print("error in shaping constraints", j, self.network.path[i][0])
                     return
             for tb in max_service:
-                file.write('0')
+                file.write("0")
                 for i in self.network.arrival_shaping[k][1]:
-                    file.write('+ f{0}s{1}u{1}'.format(i, j))
-                file.write('<= {0} + {1}u{2};\n'.format(tb.sigma, tb.rho, j))
+                    file.write("+ f{0}s{1}u{1}".format(i, j))
+                file.write("<= {0} + {1}u{2};\n".format(tb.sigma, tb.rho, j))
 
     @property
     def delay_servers(self) -> np.ndarray:
@@ -98,22 +115,27 @@ class TfaLP:
         Computes the delay bounds of all the servers.
         :return: the list of the delays of the servers
         """
-        file = open(self.filename, 'w')
-        file.write('max:')
+        file = open(self.filename, "w")
+        file.write("max:")
         for i in range(self.network.num_servers):
-            file.write('+ d{} '.format(i))
-        file.write(';\n')
+            file.write("+ d{} ".format(i))
+        file.write(";\n")
         self.tfa_constraints_server(file)
         self.tfa_variables(file)
         file.close()
-        s = sp.run(LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding='utf-8').stdout
-        tab_values = s.split('\n')[4:-1]
-        values = [[token for token in line.split(' ') if not token == ""] for line in tab_values]
+        s = sp.run(
+            LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding="utf-8"
+        ).stdout
+        tab_values = s.split("\n")[4:-1]
+        values = [
+            [token for token in line.split(" ") if not token == ""]
+            for line in tab_values
+        ]
         if not values:
             return self.network.num_servers * [np.inf]
         tab_delays = np.zeros(self.network.num_servers)
         for [s1, s2] in values:
-            if s1[0] == 'd':
+            if s1[0] == "d":
                 tab_delays[int(float(s1[1:]))] = float(s2)
         return tab_delays
 
@@ -133,7 +155,10 @@ class TfaLP:
         :return: the list of delay bounds
         """
         tab_delays = self.delay_servers
-        return [sum(tab_delays[i] for i in self.network.path[j]) for j in range(self.network.num_flows)]
+        return [
+            sum(tab_delays[i] for i in self.network.path[j])
+            for j in range(self.network.num_flows)
+        ]
 
     @property
     def ff_equiv(self) -> Network:
@@ -147,6 +172,16 @@ class TfaLP:
             d = 0
             arrival_curve = self.network.flows[i].arrival_curve[0]
             for j in self.network.flows[i].path:
-                flows += [Flow([TokenBucket(arrival_curve.sigma + d * arrival_curve.rho, arrival_curve.rho)], [j])]
+                flows += [
+                    Flow(
+                        [
+                            TokenBucket(
+                                arrival_curve.sigma + d * arrival_curve.rho,
+                                arrival_curve.rho,
+                            )
+                        ],
+                        [j],
+                    )
+                ]
                 d += delays[j]
         return Network(self.network.servers, flows)

@@ -31,7 +31,9 @@ class SfaLP:
         """
         self.network = network
         self.filename = filename
-        self.forest, self.list_first, self.removed_edges = self.network.decomposition([])
+        self.forest, self.list_first, self.removed_edges = self.network.decomposition(
+            []
+        )
 
     def sfa_variables(self, file):
         """
@@ -39,21 +41,34 @@ class SfaLP:
         :param file: the file where the constraints are written
         :return: None
         """
-        file.write('\n /* sigma variables*/\n')
+        file.write("\n /* sigma variables*/\n")
         i = 0
         for f in range(self.forest.num_flows):
             if i < self.network.num_flows and f == self.list_first[i]:
-                file.write('x{0} = {1};\n'.format(f, self.network.flows[i].arrival_curve[0].sigma))
+                file.write(
+                    "x{0} = {1};\n".format(
+                        f, self.network.flows[i].arrival_curve[0].sigma
+                    )
+                )
                 i += 1
             else:
                 j = self.forest.flows[f - 1].path[0]
-                file.write('x{0} = x{1} + '.format(f, f - 1))
+                file.write("x{0} = x{1} + ".format(f, f - 1))
                 for k in self.forest.flows_in_server[j]:
                     if not k == f - 1:
-                        file.write('+ {0} x{1}'.format(self.forest.flows[f].arrival_curve[0].rho /
-                                                       self.network.servers[j].service_curve[0].rate, k))
-                file.write('+ {0};\n'.format(self.forest.flows[f].arrival_curve[0].rho *
-                                             self.network.servers[j].service_curve[0].latency))
+                        file.write(
+                            "+ {0} x{1}".format(
+                                self.forest.flows[f].arrival_curve[0].rho
+                                / self.network.servers[j].service_curve[0].rate,
+                                k,
+                            )
+                        )
+                file.write(
+                    "+ {0};\n".format(
+                        self.forest.flows[f].arrival_curve[0].rho
+                        * self.network.servers[j].service_curve[0].latency
+                    )
+                )
 
     @property
     def ff_equiv(self) -> Network:
@@ -61,21 +76,26 @@ class SfaLP:
         The equivalent network: all the arrival curves of the flows at each server
         :return: the equivalent network
         """
-        file = open(self.filename, 'w')
-        file.write('max:')
+        file = open(self.filename, "w")
+        file.write("max:")
         for f in range(self.forest.num_flows):
-            file.write('+ x{0} '.format(f))
-        file.write(';\n')
+            file.write("+ x{0} ".format(f))
+        file.write(";\n")
         self.sfa_variables(file)
         file.close()
-        s = sp.run(LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding='utf-8').stdout
-        tab_values = s.split('\n')[4:-1]
-        values = [[token for token in line.split(' ') if not token == ""] for line in tab_values]
+        s = sp.run(
+            LPSOLVEPATH + ["-S2", self.filename], stdout=sp.PIPE, encoding="utf-8"
+        ).stdout
+        tab_values = s.split("\n")[4:-1]
+        values = [
+            [token for token in line.split(" ") if not token == ""]
+            for line in tab_values
+        ]
         if not values:
             for f in range(self.forest.num_flows):
                 self.forest.flows[f].arrival_curve[0].sigma = np.inf
         for [s1, s2] in values:
-            if s1[0] == 'x':
+            if s1[0] == "x":
                 self.forest.flows[int(float(s1[1:]))].arrival_curve[0].sigma = float(s2)
         return self.forest
 
@@ -86,10 +106,24 @@ class SfaLP:
         :return: the list of delay bounds
         """
         ff_equiv_net = self.ff_equiv
-        sum_sigma = [sum([ff_equiv_net.flows[i].arrival_curve[0].sigma for i in ff_equiv_net.flows_in_server[j]])
-                     for j in range(self.network.num_servers)]
-        sum_ar_rates = [sum([ff_equiv_net.flows[i].arrival_curve[0].rho for i in ff_equiv_net.flows_in_server[j]])
-                        for j in range(self.network.num_servers)]
+        sum_sigma = [
+            sum(
+                [
+                    ff_equiv_net.flows[i].arrival_curve[0].sigma
+                    for i in ff_equiv_net.flows_in_server[j]
+                ]
+            )
+            for j in range(self.network.num_servers)
+        ]
+        sum_ar_rates = [
+            sum(
+                [
+                    ff_equiv_net.flows[i].arrival_curve[0].rho
+                    for i in ff_equiv_net.flows_in_server[j]
+                ]
+            )
+            for j in range(self.network.num_servers)
+        ]
         d_list = []
         i = 0
         lat = 0
@@ -101,11 +135,17 @@ class SfaLP:
                 lat = 0
                 s_rate = np.inf
             j = ff_equiv_net.flows[f].path[0]
-            lat += self.network.servers[j].service_curve[0].latency + \
-                   (sum_sigma[j] - ff_equiv_net.flows[f].arrival_curve[0].sigma) / \
-                   self.network.servers[j].service_curve[0].rate
-            s_rate = min(s_rate, self.network.servers[j].service_curve[0].rate - sum_ar_rates[j] +
-                         self.network.flows[i].arrival_curve[0].rho)
+            lat += (
+                self.network.servers[j].service_curve[0].latency
+                + (sum_sigma[j] - ff_equiv_net.flows[f].arrival_curve[0].sigma)
+                / self.network.servers[j].service_curve[0].rate
+            )
+            s_rate = min(
+                s_rate,
+                self.network.servers[j].service_curve[0].rate
+                - sum_ar_rates[j]
+                + self.network.flows[i].arrival_curve[0].rho,
+            )
         d_list += [lat + self.network.flows[i].arrival_curve[0].sigma / s_rate]
         return d_list
 

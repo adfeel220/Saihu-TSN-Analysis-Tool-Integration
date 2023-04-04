@@ -37,6 +37,7 @@ class Flow:
     <Flow: α(t) = min [1 + 2t, 3 + 4t]; π = [1, 2, 3]>
     <BLANKLINE>
     """
+
     def __init__(self, arrival_curve: List[TokenBucket], path: List[int]):
         self.arrival_curve = arrival_curve
         self.path = path

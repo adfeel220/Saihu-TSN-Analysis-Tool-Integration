@@ -35,15 +35,24 @@ class Server:
              \u03C3(t) = min [5 + 20t, 0 + 30t]>
     <BLANKLINE>
     """
-    def __init__(self, service_curve: List[RateLatency], max_service_curve: List[TokenBucket]):
+
+    def __init__(
+        self, service_curve: List[RateLatency], max_service_curve: List[TokenBucket]
+    ):
         self.service_curve = service_curve
         self.max_service_curve = max_service_curve
 
     def __str__(self) -> str:
-        return "β(t) = max %s\n         \u03C3(t) = min %s" % (self.service_curve, self.max_service_curve)
+        return "β(t) = max %s\n         \u03C3(t) = min %s" % (
+            self.service_curve,
+            self.max_service_curve,
+        )
 
     def __repr__(self) -> str:
         return "<Server: %s>\n" % self.__str__()
 
     def __eq__(self, other: Server):
-        return self.max_service_curve == other.max_service_curve and self.service_curve == other.service_curve
+        return (
+            self.max_service_curve == other.max_service_curve
+            and self.service_curve == other.service_curve
+        )

@@ -18,7 +18,7 @@ Table of Contents
     * [Credits to Files](#credits-to-files)
 * [Installation](#installation)
     * [Requirements](#requirements)
-    * [Dependencies](#dependency)
+    * [Dependencies](#dependencies)
 * [How to Use This Tool](#how-to-use)
     * [Network Description File](#network-description-file)
         * [Network Definition](#network-definition)
@@ -186,6 +186,12 @@ Here are the authors that implemented the individual tools used in this project.
 
 # Installation
 Please install the following requirements on your machine.
+
+You can quickly build the project using `setup.py` by
+```bash
+pip install -e .
+```
+
 ## Requirements
 - `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
 - `Java`: `JDK 16.0.2`

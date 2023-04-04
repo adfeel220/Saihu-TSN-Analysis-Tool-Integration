@@ -39,7 +39,7 @@ def _sort_lists_of_lists(lol: List[List[int]]):
 
 
 def topology(num_servers: int, num_flows: int, path: List[List[int]]):
-    """"
+    """ "
     Topology builds the set of successors and predecessors of the network,
     also builds for each servers the list of flows crossing it.
 
@@ -60,14 +60,20 @@ def topology(num_servers: int, num_flows: int, path: List[List[int]]):
     """
     successors = [[] for _ in range(num_servers)]
     predecessors = [[] for _ in range(num_servers)]
-    flows_in_server = [[i for i in range(num_flows) if j in path[i]] for j in range(num_servers)]
+    flows_in_server = [
+        [i for i in range(num_flows) if j in path[i]] for j in range(num_servers)
+    ]
     for i in range(num_flows):
         for j in range(len(path[i]) - 1):
             if path[i][j + 1] not in successors[path[i][j]]:
                 successors[path[i][j]] += [path[i][j + 1]]
             if path[i][j] not in predecessors[path[i][j + 1]]:
                 predecessors[path[i][j + 1]] += [path[i][j]]
-    return _sort_lists_of_lists(predecessors), _sort_lists_of_lists(successors), _sort_lists_of_lists(flows_in_server)
+    return (
+        _sort_lists_of_lists(predecessors),
+        _sort_lists_of_lists(successors),
+        _sort_lists_of_lists(flows_in_server),
+    )
 
 
 def server_depth(num_servers: int, successors: List[List[int]]) -> List[int]:
@@ -131,7 +137,10 @@ def trunc_path(path: List[List[int]], list_servers: [List[int]]) -> List[List[in
     >>> trunc_path([[0, 1, 2, 3], [2, 3, 4], [3, 2, 5, 1]], [0, 1, 3])
     [[0, 1, 3], [3], [3, 1]]
     """
-    return [[path[i][j] for j in range(len(path[i])) if path[i][j] in list_servers] for i in range(len(path))]
+    return [
+        [path[i][j] for j in range(len(path[i])) if path[i][j] in list_servers]
+        for i in range(len(path))
+    ]
 
 
 def reindexing(lis: List[int]) -> Dict[int]:
@@ -148,8 +157,14 @@ def reindexing(lis: List[int]) -> Dict[int]:
     return dict(zip(lis, range(len(lis))))
 
 
-def dfs(u: int, num_servers: int, successors: List[List[int]], state: List[int], queue: List[int],
-        sort: List[int]) -> Tuple[List[int], List[int], List[int]]:
+def dfs(
+    u: int,
+    num_servers: int,
+    successors: List[List[int]],
+    state: List[int],
+    queue: List[int],
+    sort: List[int],
+) -> Tuple[List[int], List[int], List[int]]:
     """
     Depth-first-search implementation of a graph without cycles
 
@@ -169,7 +184,9 @@ def dfs(u: int, num_servers: int, successors: List[List[int]], state: List[int],
     while not queue == []:
         for v in successors[u]:
             if state[v] == 0:
-                (state, queue, sort) = dfs(v, num_servers, successors, state, queue, sort)
+                (state, queue, sort) = dfs(
+                    v, num_servers, successors, state, queue, sort
+                )
             elif state[v] == 1:
                 raise NameError("Network has cycles: feed-forward analysis impossible")
         sort = [u] + sort
@@ -286,14 +303,20 @@ class Network:
         self.arrival_shaping = arrival_shaping
 
     def __str__(self) -> str:
-        return "Flows:\n%s\nServers:\n%s" % (list_to_str(self.flows), list_to_str(self.servers))
+        return "Flows:\n%s\nServers:\n%s" % (
+            list_to_str(self.flows),
+            list_to_str(self.servers),
+        )
 
     def __repr__(self) -> str:
         return "<Network:\n%s>" % self.__str__()
 
     def __eq__(self, other: Network):
-        return self.flows == other.flows and self.servers == other.servers and \
-               self.arrival_shaping == other.arrival_shaping
+        return (
+            self.flows == other.flows
+            and self.servers == other.servers
+            and self.arrival_shaping == other.arrival_shaping
+        )
 
     @property
     def is_feed_forward(self) -> bool:
@@ -535,7 +558,9 @@ class Network:
         """
         u = 0
         for j in range(self.num_servers):
-            r = sum([self.flows[i].arrival_curve[0].rho for i in self.flows_in_server[j]])
+            r = sum(
+                [self.flows[i].arrival_curve[0].rho for i in self.flows_in_server[j]]
+            )
             u = max(u, r / self.servers[j].service_curve[0].rate)
         return u
 
@@ -558,7 +583,9 @@ class Network:
         """
         u = []
         for j in range(self.num_servers):
-            r = sum([self.flows[i].arrival_curve[0].rho for i in self.flows_in_server[j]])
+            r = sum(
+                [self.flows[i].arrival_curve[0].rho for i in self.flows_in_server[j]]
+            )
             u += [r / self.servers[j].service_curve[0].rate]
         return u
 
@@ -582,13 +609,19 @@ class Network:
         res_rate = np.inf
         for j in self.path[foi]:
             res_server = self.servers[j].service_curve[0].rate
-            res_cross = sum([self.flows[i].arrival_curve[0].rho for i in self.flows_in_server[j] if not i == foi])
+            res_cross = sum(
+                [
+                    self.flows[i].arrival_curve[0].rho
+                    for i in self.flows_in_server[j]
+                    if not i == foi
+                ]
+            )
             res_rate = min(res_rate, res_server - res_cross)
         return res_rate
 
     @property
     def residual_network(self) -> List[Server]:
-        """"
+        """ "
         Computes the residual service curves of all servers (to be used for lower priority flows for example)
         This method only applies to feed-forward networks
 
@@ -610,13 +643,21 @@ class Network:
         ]
         """
         if not self.is_elementary:
-            raise Exception("please decompose the network into elementary pieces before computing\
-                            the residual network")
+            raise Exception(
+                "please decompose the network into elementary pieces before computing\
+                            the residual network"
+            )
         list_servers = []
         for j in range(self.num_servers):
-            ac = tb_sum([self.flows[i].arrival_curve[0] for i in self.flows_in_server[j]])
-            list_servers += [Server([residual_blind(self.servers[j].service_curve[0], ac)],
-                                    self.servers[j].max_service_curve)]
+            ac = tb_sum(
+                [self.flows[i].arrival_curve[0] for i in self.flows_in_server[j]]
+            )
+            list_servers += [
+                Server(
+                    [residual_blind(self.servers[j].service_curve[0], ac)],
+                    self.servers[j].max_service_curve,
+                )
+            ]
         return list_servers
 
     def sub_network(self, foi: int) -> (Network, int, List[int], List[int]):
@@ -660,8 +701,13 @@ class Network:
         ind_s = reindexing(list_servers)
         ind_f = reindexing(list_flows)
         servers = [self.servers[i] for i in list_servers]
-        flows = [Flow(self.flows[i].arrival_curve, [ind_s[sub_path[i][j]] for j in range(len(sub_path[i]))])
-                 for i in list_flows]
+        flows = [
+            Flow(
+                self.flows[i].arrival_curve,
+                [ind_s[sub_path[i][j]] for j in range(len(sub_path[i]))],
+            )
+            for i in list_flows
+        ]
         arrival_shaping = []
         for i in range(len(self.arrival_shaping)):
             x, y, z = self.arrival_shaping[i]
@@ -670,7 +716,9 @@ class Network:
         sub_net = Network(servers, flows, arrival_shaping)
         return sub_net, ind_f[foi], list_flows, list_servers
 
-    def decomposition(self, keep_edges: List[(int, int)]) -> (Network, List[int], List[(int, int)]):
+    def decomposition(
+        self, keep_edges: List[(int, int)]
+    ) -> (Network, List[int], List[(int, int)]):
         """
         Decomposition of the network by keeping edges in keep_edges, and cutting the flows.
         returns a new network with arrival curve[0] for all flows obtained from one flow
@@ -726,17 +774,27 @@ class Network:
                 else:
                     pre += 1
                     path_list += [p]
-                    flow_list += [Flow(deepcopy([self.flows[flow].arrival_curve[0]]), p)]
+                    flow_list += [
+                        Flow(deepcopy([self.flows[flow].arrival_curve[0]]), p)
+                    ]
                     p = [path[i + 1]]
                     dict_removed_edges[(path[i], path[i + 1])] += [pre]
                 i += 1
             pre += 1
             flow_list += [Flow(deepcopy([self.flows[flow].arrival_curve[0]]), p)]
-        arrival_shaping_bis = [(j, [list_first[i] for i in l], sc) for (j, l, sc) in self.arrival_shaping]
-        arrival_shaping_ter = [(j, dict_removed_edges[(i, j)], self.servers[i].max_service_curve)
-                               for (i, j) in dict_removed_edges.keys() if self.servers[i].max_service_curve]
-        return Network(self.servers, flow_list, arrival_shaping_bis + arrival_shaping_ter), list_first, \
-                       dict_removed_edges.keys()
+        arrival_shaping_bis = [
+            (j, [list_first[i] for i in l], sc) for (j, l, sc) in self.arrival_shaping
+        ]
+        arrival_shaping_ter = [
+            (j, dict_removed_edges[(i, j)], self.servers[i].max_service_curve)
+            for (i, j) in dict_removed_edges.keys()
+            if self.servers[i].max_service_curve
+        ]
+        return (
+            Network(self.servers, flow_list, arrival_shaping_bis + arrival_shaping_ter),
+            list_first,
+            dict_removed_edges.keys(),
+        )
 
     def unfold(self, foi: int) -> Tuple[Network, int]:
         """
@@ -800,8 +858,11 @@ class Network:
                     pc = [k]
                     ind = 1
                     next_s = list_servers[k][1]
-                    while ind < len(self.path[i]) and next_s < len(list_servers) \
-                            and self.path[i][ind] == list_servers[next_s][0]:
+                    while (
+                        ind < len(self.path[i])
+                        and next_s < len(list_servers)
+                        and self.path[i][ind] == list_servers[next_s][0]
+                    ):
                         pc += [next_s]
                         ind += 1
                         next_s = list_servers[next_s][1]
@@ -830,8 +891,12 @@ class Network:
                 dict_path[(self.path[i][0], self.path[i][-1])] += [i]
         new_flows = []
         for k in dict_path.keys():
-            new_flows += [Flow([tb_sum([self.flows[i].arrival_curve[0] for i in dict_path[k]])],
-                               self.path[dict_path[k][0]])]
+            new_flows += [
+                Flow(
+                    [tb_sum([self.flows[i].arrival_curve[0] for i in dict_path[k]])],
+                    self.path[dict_path[k][0]],
+                )
+            ]
         return new_flows
 
     def aggregate_network(self, foi: int) -> (Network, int):
@@ -870,7 +935,9 @@ class Network:
         if not self.is_tree:
             raise Exception("method can only apply to trees")
         shaped_flows = sum([ash[1] for ash in self.arrival_shaping], [])
-        unshaped_flows = [i for i in range(self.num_flows) if i not in shaped_flows and not i == foi]
+        unshaped_flows = [
+            i for i in range(self.num_flows) if i not in shaped_flows and not i == foi
+        ]
         new_flow_list = []
         new_arrival_shaping = []
         new_flow_list += [self.flows[foi]]
