@@ -82,9 +82,6 @@ class TSN_Analyzer:
     def __init__(
         self,
         netfile: str = None,
-        jar_path: str = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "javapy/")
-        ),
         temp_path: str = os.path.abspath("./"),
         output_shaping: str = "AUTO",
     ) -> None:
@@ -99,7 +96,7 @@ class TSN_Analyzer:
         self.script_handler = NetworkScriptHandler()
         self.results = list()
         self.netfile = netfile
-        self._jar_path = jar_path
+        self._jar_path = os.path.join(os.path.dirname(__file__), "javapy/")
         self._temp_path = temp_path
         self.serv_delay_mul = None
         self.flow_delay_mul = None
@@ -182,7 +179,7 @@ class TSN_Analyzer:
         output_file: [str] path of the output report
         clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
         """
-        print("Writing JSON result file...", end="")
+        print(f'Writing JSON result file "{output_file}"...', end="")
 
         if len(self.results) == 0:
             print("No result is written to file: No results analyzed before")
@@ -199,7 +196,6 @@ class TSN_Analyzer:
         output_index = 0
         # We summarize one output file for each network
         for net_name, results in networks.items():
-
             # Determine report filename
             output_file = check_file_ext(output_file, "json")
             if output_index > 0:
@@ -228,7 +224,6 @@ class TSN_Analyzer:
             }
 
             for res in results:
-
                 tool_method_name = f"{res.tool}_{res.method}"
 
                 # e2e flows
@@ -282,7 +277,7 @@ class TSN_Analyzer:
         comment: [str] a comment written at the beginning of the report
         clear: (Optional) [bool] Clear all content after finishing writing report. Default is True
         """
-        print("Writing Markdown report...", end="")
+        print(f'Writing Markdown report "{output_file}"...', end="")
 
         if len(self.results) == 0:
             print("No report generated: No results analyzed before")
@@ -300,7 +295,6 @@ class TSN_Analyzer:
         output_index = 0
         # We summarize one output file for each network
         for net_name, res in networks.items():
-
             # sort results by "tool-method" in alphabetical order
             res_sorted = dict(
                 zip(["{m}{t}".format(t=r.tool, m=r.method) for r in res], res)
@@ -886,7 +880,7 @@ class TSN_Analyzer:
             flush=True,
         )
         # check if methods are valid
-        supported_methods = {"TFA", "SFA", "PMOO", "TMA"}
+        supported_methods = {"TFA", "SFA", "PMOO", "TMA", "LUDB"}
         if not set(methods).issubset(supported_methods):
             not_supported = set(methods) - supported_methods
             executable_methods = list(set(methods).intersection(supported_methods))
@@ -1560,7 +1554,6 @@ class TSN_Analyzer:
         y = dict()
         index = start
         for elem in x:
-
             # solve attribute value
             if type(attr_name) is str:
                 attr_val = getattr(elem, attr_name)

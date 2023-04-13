@@ -31,5 +31,5 @@ if __name__ == "__main__":
     analyzer = TSN_Analyzer(f"industry{num_flows}.json", temp_path="./temp/")
     analyzer.analyze_xtfa()
     analyzer.analyze_panco(methods=["PLP", "ELP"])
-    analyzer.analyze_dnc(methods=["SFA", "PMOO", "TMA"])
+    analyzer.analyze_dnc(methods=["SFA", "PMOO", "LUDB"])
     analyzer.export(f"ind{num_flows}")

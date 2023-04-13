@@ -12,6 +12,16 @@ __license__ = "BSD-3"
 
 
 import os.path
-# LPSOLVEPATH = ["wsl", "lp_solve", "-s5"]
-LPSOLVEPATH = [os.path.join(os.path.dirname(__file__), 'lp_solve')]
+import json
 
+# LPSOLVEPATH = ["wsl", "lp_solve", "-s5"]
+LPSOLVEPATH = [os.path.join(os.path.dirname(__file__), "lp_solve")]
+
+if not os.path.exists(LPSOLVEPATH):
+    path_file = json.load(
+        open(
+            os.path.join(os.path.dirname(__file__), "..", "resources", "paths.json"),
+            "r",
+        )
+    )
+    LPSOLVEPATH = path_file["lpsolve"]

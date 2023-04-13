@@ -172,6 +172,8 @@ Here are the authors that implemented the individual tools used in this project.
    │  └- netscript.py
    │  └- net_gen.py
    │  └- unit_util.py
+   └- resources/
+   │  └- paths.json
    └- interface.py
    └- result.py
    └- environment.yml
@@ -211,6 +213,8 @@ Here are the authors that implemented the individual tools used in this project.
         - `netscript.py`: The sciprt handler to manipulate network definition files.
         - `net_gen.py`: Methods to automatically generate interleave/ring/mesh network with arbitrary number of homogeneous servers.
         - `unit_util.py`: Methods to do multiplier/unit parsing and manipulation.
+    - `resources/`:
+        - `paths.json`: Stores paths to locate `cplex` and `lpsolve`. `cplex` path is used only for `LUDB` method of `DNC`. This `lpsolve` address is only used when no `lp_solve` is in `panco`.
 - `README.md`: This `README`
 - `tool-usage.md`: Brief description of the included tools.
 
@@ -229,6 +233,7 @@ pip install -e .
 
 ## Requirements
 - `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
+- `cplex`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency.
 - `Java`: `JDK 16.0.2`
 - `Python`: Create an environment using `environment.yml` or installing `numpy`, `networkx`, `matplotlib`, `pulp`, and `mdutils` with `Python>=3.8`.
 
@@ -402,6 +407,7 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     |   **ELP**   |       |       |   V   |            |
     |  **PMOO**   |   V   |
     |   **TMA**   |   V   |
+    |  **LUDB**   |   V   |
 
     Note: TMA stands for Tandem Matching Analysis
     
@@ -439,11 +445,10 @@ Here is a list of all available methods
 ### Init
 An analyzer can be initialized by
 ```
-analyzer = TSN_Analyzer(netfile, jar_path, temp_path, shaping)
+analyzer = TSN_Analyzer(netfile, temp_path, shaping)
 ```
 All arguments are optional, each of them represents
 - `netfile`: The path to the network definition file, either a physical network or an output-port network.
-- `jar_path`: The directory of the DNC `.jar` file. Default is in `javapy/`
 - `temp_path`: The path to the tempary directory to put the execution artifacts.
 - `output_shaping`: A string to select output shaping mode, can be _AUTO_, _ON_, or _OFF_. Default is _AUTO_, which means to consider output shaping if possible.
 
