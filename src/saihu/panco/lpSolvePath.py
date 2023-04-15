@@ -15,9 +15,9 @@ import os.path
 import json
 
 # LPSOLVEPATH = ["wsl", "lp_solve", "-s5"]
-LPSOLVEPATH = [os.path.join(os.path.dirname(__file__), "lp_solve")]
+LPSOLVEPATH = [os.path.dirname(__file__), "lp_solve"]
 
-if not os.path.exists(LPSOLVEPATH):
+if not os.path.exists(os.path.join(*LPSOLVEPATH)):
     path_file = json.load(
         open(
             os.path.join(os.path.dirname(__file__), "..", "resources", "paths.json"),
