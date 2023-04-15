@@ -1062,7 +1062,9 @@ class TSN_Analyzer:
                 if target.lower() == "xml":
                     return None, in_netfile
             # Conversion is needed
-            print("Receiving an XML file, converting to a JSON ...", end="")
+            print(
+                f'Receive an XML file "{in_netfile}", converting to a JSON ...', end=""
+            )
             if op_net_path is None:
                 op_net_path = os.path.join(self._temp_path, "tempnet.json")
             self.script_handler.phynet_to_opnet_json(in_netfile, op_net_path)
@@ -1077,7 +1079,9 @@ class TSN_Analyzer:
                     return in_netfile, None
 
             # Conversion is needed
-            print("Receiving a JSON file, converting to an XML ...", end="")
+            print(
+                f'Receive a JSON file "{in_netfile}", converting to an XML ...', end=""
+            )
             if phy_net_path is None:
                 phy_net_path = os.path.join(self._temp_path, "tempnet.xml")
             self.script_handler.opnet_json_to_phynet(in_netfile, phy_net_path)
@@ -1258,7 +1262,7 @@ class TSN_Analyzer:
         table_res = np.empty(
             (len(flow_mapping) + 1, len(tlm_mapping) + 2), dtype="object"
         )
-        table_res[:] = "N/A"
+        table_res[:] = ""
 
         # Column labels
         table_res[0, :] = ["Flow name", *tlm_mapping.keys(), "Minimum (best)"]
@@ -1357,7 +1361,7 @@ class TSN_Analyzer:
         table_res = np.empty(
             (len(server_mapping) + 2, len(tlm_mapping) + 2), dtype="object"
         )
-        table_res[:] = "N/A"
+        table_res[:] = ""
 
         # column/row labels
         table_res[0, :] = ["server name", *tlm_mapping.keys(), "Minimum (best)"]
@@ -1437,7 +1441,7 @@ class TSN_Analyzer:
         # Table as a numpy array with initial value ""
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
         table_res = np.empty((len(path) + 1, len(tlm_mapping) + 1), dtype="object")
-        table_res[:] = "N/A"
+        table_res[:] = ""
 
         # column labels
         table_res[0, :] = ["server name", *tlm_mapping.keys()]
@@ -1490,7 +1494,7 @@ class TSN_Analyzer:
         table_perv = np.empty(
             (len(result_method_dict) + 1, len(tool_mapping) + 1), dtype="object"
         )
-        table_perv[:] = "N/A"
+        table_perv[:] = ""
         # row labels
         table_perv[:, 0] = ["method\\tool", *result_method_dict.keys()]
         # column labels
@@ -1527,7 +1531,7 @@ class TSN_Analyzer:
                 continue
 
             utility = self.script_handler.get_network_utility(res.network_source)
-            max_utility = "N/A"
+            max_utility = ""
             if len(utility) > 0:
                 max_utility = max(utility.values())
 
