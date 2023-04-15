@@ -132,53 +132,54 @@ Here are the authors that implemented the individual tools used in this project.
 
 
 # Project Structure
-```
-.
-└- README.md
-└- tool-usage.md
-└- LICENSE.txt
-└- example/
-│  └- example.py
-│  └- demo.json
-│  └- demo.xml
-│  └- demo_report.md
-│  └- demo_data.json
-│  └- temp
-│     └- ... (execution artifacts)
-│
-└- saihu
-   └- javapy/
-   │  └- dnc_analysis.jar
-   │  └- dnc_exe.py
-   │  └- NetworkAnalysis
-   │     └- NetArgParser.java
-   │     └- NetworkScriptHandler.java
-   │     └- NetworkAnalysis.java
-   │
-   └- Linear_TFA/
-   │  └- Linear_TFA.py
-   │  └- ...
-   │
-   └- xTFA/
-   │  └- ...
-   │
-   └- panco/
-   │  └- lp_solve
-   │  └- lpSolvePath.py
-   │  └- panco_analyzer.py
-   │  └- ...
-   └- netscript/
-   │  └- netdef.py
-   │  └- netscript.py
-   │  └- net_gen.py
-   │  └- unit_util.py
-   └- resources/
-   │  └- paths.json
-   └- interface.py
-   └- result.py
-   └- environment.yml
-   └- setup.py
-```
+
+    .
+    └- README.md
+    └- tool-usage.md
+    └- LICENSE.txt
+    └- example/
+    │  └- example.py
+    │  └- demo.json
+    │  └- demo.xml
+    │  └- demo_report.md
+    │  └- demo_data.json
+    │  └- temp
+    │     └- ... (execution artifacts)
+    │
+    └- saihu
+    └- javapy/
+    │  └- dnc_analysis.jar
+    │  └- dnc_exe.py
+    │  └- NetworkAnalysis
+    │     └- NetArgParser.java
+    │     └- NetworkScriptHandler.java
+    │     └- NetworkAnalysis.java
+    │     └- FileGetter.java
+    │
+    └- Linear_TFA/
+    │  └- Linear_TFA.py
+    │  └- ...
+    │
+    └- xTFA/
+    │  └- ...
+    │
+    └- panco/
+    │  └- lp_solve
+    │  └- lpSolvePath.py
+    │  └- panco_analyzer.py
+    │  └- ...
+    └- netscript/
+    │  └- netdef.py
+    │  └- netscript.py
+    │  └- net_gen.py
+    │  └- unit_util.py
+    └- resources/
+    │  └- paths.json
+    └- interface.py
+    └- result.py
+    └- environment.yml
+    └- setup.py
+
 ## File description
 - `interface.py`: The general interface to use the analysis tools. Generally speaking, user can only import function from here to access all functionalities.
 - `result.py`: The formated result class from all tools.
@@ -201,6 +202,7 @@ Here are the authors that implemented the individual tools used in this project.
             - `NetArgParser.java`: Parsing the input arguments.
             - `NetworkScriptHandler.java`: Construct a DNC `ServerGraph` object for further analysis based on the input network description file.
             - `NetworkAnalysis`: Perform analysis given the tools specified in input arguments and print them in `.json` format.
+            - `FileGetter`: Helper class to resolve paths and get files.
     - `Linear_TFA/Linear_TFA.py`: The implementation of `Linear TFA solver`.
     - `xTFA/`: The original `xTFA` module from [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa)
     - `panco/`:
@@ -243,7 +245,7 @@ You may also choose to not install the environment if you choose not to use all 
 - `panco`: Requires `Python`/`lpsolve`/`panco package`
 - `Linear TFA`: Requires `Python`/`pulp`
 - `xTFA`: Requires `Python`/`xtfa package`
-- `DNC`: Requires `Java` with `JDK 16`
+- `DNC`: Requires `Java` with `JDK 16` and `cplex` if you want to use `LUDB`.
 
 # How to Use
 You need to write your network in one of the network description format specified below. Then use the Python interface to do the analysis.
@@ -285,7 +287,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     - Other attributes are optional, but used as a global parameter. If some parameters are not specified in each server/flow, the system uses the global parameter defined here instead.
 
     Example:
-    ```
+    ```xml
 	<network name="example-network" technology="FIFO+IS+CEIL" overhead="0" maximum-packet-size="0"/>
     ```
 - `station`/`switch`: The two names would not affect the analysis result, but for representing the physical network and readability. Can have the following attributes
@@ -294,7 +296,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     - `service-rate`: The service rate of the rate-latency curve. Can assign different rate units, `Mbps`... (But not `bps` alone)
 
     Example:
-    ```
+    ```xml
     <station service-latency="1us" service-rate="100Gbps" name="src0"/>
 	<switch  service-latency="1us" service-rate="100Gbps" name="s0"/>
     ```
@@ -307,7 +309,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     - `transmission-capacity`: The transmission capacity of the link. Can assign different rate units, `Mbps`... (But not `bps` alone)
 
     Example:
-    ```
+    ```xml
 	<link from="src0" to="s0" fromPort="o0" toPort="i0" transmission-capacity="200Gbps" name="src_sw_0"/>
     ```
     Note: Service curve can also be defined on links as defined on station/switch. In this way, the service curve defined on the link that directly attached to the output port would be considered first.
@@ -359,11 +361,11 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     - `max/min_packet_length`: The maximum/minimum packet length of the flow.
 
     Example:
-    ```
+    ```json
     "flows": [
         {
             "name": "f0",
-            "path": ["s0-o0", "s1-o0],   // output port names
+            "path": ["s0-o0", "s1-o0"],   // output port names
             "arrival_curve": {
                 "bursts": [1, "5GB"],    // 1. Multiple segments
                 "rates": [10, "100Gbps"] // 2. Accept number with units or pure number (default unit will be applied)
@@ -381,7 +383,7 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     - `capacity`: The output capacity of the server.
 
     Example:
-    ```
+    ```json
     "servers": [
         {
             "name": "s0-o0",

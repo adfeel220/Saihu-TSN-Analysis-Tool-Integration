@@ -2,50 +2,52 @@
     "name": "demo",
     "flow_e2e_delay": {
         "f0": {
-            "DNC_TFA": 100.00375,
             "xTFA_TFA": 99.32394489448944,
-            "Panco_TFA": 100.12500000000001,
-            "Panco_PLP": 80.05
+            "Panco_PLP": 80.05,
+            "Panco_ELP": 80.05,
+            "DNC_SFA": 80.0501253132832,
+            "DNC_PMOO": 80.20050125313283,
+            "DNC_LUDB": 80.0501253132832
         },
         "f1": {
-            "DNC_TFA": 80.075,
             "xTFA_TFA": 79.32193219321933,
-            "Panco_TFA": 80.12500000000001,
-            "Panco_PLP": 80.07
+            "Panco_PLP": 79.27000000000001,
+            "Panco_ELP": 80.08000000000001,
+            "DNC_SFA": 60.0501253132832,
+            "DNC_PMOO": 60.125313283208015,
+            "DNC_LUDB": 60.0501253132832
         },
         "f2": {
-            "DNC_TFA": 50.00375,
             "xTFA_TFA": 49.32394489448944,
-            "Panco_TFA": 50.125,
-            "Panco_PLP": 50.07
+            "Panco_PLP": 49.28,
+            "Panco_ELP": 49.28,
+            "DNC_SFA": 50.125125313283206,
+            "DNC_PMOO": 50.20068969416021,
+            "DNC_LUDB": 50.003750000000004
         }
     },
     "server_delay": {
         "s0-o0": {
-            "DNC_TFA": 50.0,
-            "xTFA_TFA": 50.0,
-            "Panco_TFA": 50.0
+            "xTFA_TFA": 50.0
         },
         "s1-o0": {
-            "DNC_TFA": 50.00375,
-            "xTFA_TFA": 49.32394489448944,
-            "Panco_TFA": 50.125
+            "xTFA_TFA": 49.32394489448944
         },
         "s1-o1": {
-            "DNC_TFA": 30.075,
-            "xTFA_TFA": 29.321932193219325,
-            "Panco_TFA": 30.125
+            "xTFA_TFA": 29.321932193219325
         }
     },
     "execution_time": {
-        "DNC_TFA": 23.0,
-        "xTFA_TFA": 46.0200309753418,
-        "Panco_TFA": 23.83899688720703,
-        "Panco_PLP": 144.8960304260254
+        "xTFA_TFA": 6.001949310302734,
+        "Panco_PLP": 142.6827907562256,
+        "Panco_ELP": 130.08499145507812,
+        "DNC_SFA": 11.0,
+        "DNC_PMOO": 8.0,
+        "DNC_LUDB": 189.0
     },
     "units": {
         "flow_delay": "us",
         "server_delay": "us",
-        "exectution_time": "ms"
+        "execution_time": "ms"
     }
 }

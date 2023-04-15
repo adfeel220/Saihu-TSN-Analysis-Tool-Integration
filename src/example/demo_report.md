@@ -15,41 +15,45 @@ Table of Contents
 	* [Network Link Utilization](#network-link-utilization)
 
 
-The is a automatically generated report with `Saihu` [Github Link](https://github.com/adfeel220/TSN_Analysis_Tool_Integration)
+The is a automatically generated report with [Saihu](https://github.com/adfeel220/Saihu-TSN-Analysis-Tool-Integration)
 
 # Network Analysis Result
 
 ## Per flow end-to-end delay bound
   
 Unit in microsecond
-|Flow name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
-| :---: | :---: | :---: | :---: | :---: |
-|f0|80.050|100.004|100.125|99.324|
-|f1|80.070|80.075|80.125|79.322|
-|f2|50.070|50.004|50.125|49.324|
+|Flow name|Panco-ELP|DNC-LUDB|Panco-PLP|DNC-PMOO|DNC-SFA|xTFA-TFA|Minimum (best)|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|f0|80.050|80.050|80.050|80.201|80.050|99.324|80.050|
+|f1|80.080|60.050|79.270|60.125|60.050|79.322|60.050|
+|f2|49.280|50.004|49.280|50.201|50.125|49.324|49.280|
 
 ## Per server delay bound
   
 Unit in microsecond
-|server name|Panco-PLP|DNC-TFA|Panco-TFA|xTFA-TFA|
-| :---: | :---: | :---: | :---: | :---: |
-|s0-o0|N/A|50.000|50.000|50.000|
-|s1-o0|N/A|50.004|50.125|49.324|
-|s1-o1|N/A|30.075|30.125|29.322|
-|Total|N/A|130.079|130.250|128.646|
+|server name|Panco-ELP|DNC-LUDB|Panco-PLP|DNC-PMOO|DNC-SFA|xTFA-TFA|Minimum (best)|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|s0-o0|N/A|N/A|N/A|N/A|N/A|50.000|50.000|
+|s1-o0|N/A|N/A|N/A|N/A|N/A|49.324|49.324|
+|s1-o1|N/A|N/A|N/A|N/A|N/A|29.322|29.322|
+|Total|N/A|0.000|N/A|0.000|0.000|128.646|128.646|
 
 ## Execution Time
   
 Unit in millisecond
 |method\tool|DNC|Panco|xTFA|
 | :---: | :---: | :---: | :---: |
-|PLP|N/A|176.434|N/A|
-|TFA|19.000|33.201|65.094|
+|ELP|N/A|130.085|N/A|
+|LUDB|189.000|N/A|N/A|
+|PLP|N/A|142.683|N/A|
+|PMOO|8.000|N/A|N/A|
+|SFA|11.000|N/A|N/A|
+|TFA|N/A|N/A|6.002|
 
 # Network Information
 
 
-This report contains 4 analysis over network **"demo"**.
+This report contains 6 analysis over network **"demo"**.
 There are **3** servers and **3** flows in the system.
 ## Network Topology
   

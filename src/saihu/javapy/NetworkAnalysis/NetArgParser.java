@@ -60,7 +60,7 @@ public class NetArgParser {
                 .argName("toolName")
                 .hasArg()
                 .required(false)
-                .desc("Name of analysis tool: TFA, SFA, PMOO, TMA with/without ++. Separate multiple methods by comma")
+                .desc("Name of analysis tool: TFA, SFA, PMOO, TMA, LUDB with/without ++. Separate multiple methods by comma")
                 .longOpt("tool")
                 .build();
 

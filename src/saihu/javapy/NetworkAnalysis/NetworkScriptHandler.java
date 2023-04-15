@@ -153,13 +153,15 @@ public class NetworkScriptHandler {
             double lat = latencies.getDouble(0);
             double rate = rates.getDouble(0);
             ServiceCurve sCurve = Curve.getFactory().createRateLatency(rate, lat);
-            for (int j=1; j<curveSegmentsNum; j++){
-                lat = latencies.getDouble(j);
-                rate = rates.getDouble(j);
-                ServiceCurve newSegment = Curve.getFactory().createRateLatency(rate, lat);
-                // Update the curve
-                sCurve = Curve.getUtils().max(sCurve, newSegment);
-            }
+            // Combine multiple segments, temporarily disabled because it causes trouble while calculating with
+            // PMOO, TMA and LUDB
+//            for (int j=1; j<curveSegmentsNum; j++){
+//                lat = latencies.getDouble(j);
+//                rate = rates.getDouble(j);
+//                ServiceCurve newSegment = Curve.getFactory().createRateLatency(rate, lat);
+//                // Update the curve
+//                sCurve = Curve.getUtils().max(sCurve, newSegment);
+//            }
 
             // Construct max service curve
             double maxPacketLength = getMaxPacketLength(i);
@@ -167,8 +169,16 @@ public class NetworkScriptHandler {
             Curve maxCurve = Curve.getFactory().createTokenBucket(capacity, maxPacketLength);
             MaxServiceCurve msCurve = Curve.getFactory().createMaxServiceCurve(maxCurve);
 
+            String multiplexing = serverInfo.optString("multiplexing", "FIFO");
+            AnalysisConfig.Multiplexing localMultiplexing;
+            if (multiplexing.equalsIgnoreCase("FIFO")) {
+                localMultiplexing = AnalysisConfig.Multiplexing.FIFO;
+            } else {
+                localMultiplexing = AnalysisConfig.Multiplexing.ARBITRARY;
+            }
+
             // Add server to graph
-            Server newServer = network.addServer(serverName, sCurve, msCurve, AnalysisConfig.Multiplexing.FIFO, false, false);
+            Server newServer = network.addServer(serverName, sCurve, msCurve, localMultiplexing, false, false);
             netServers.add(newServer);
         }
         return serverNum;
@@ -248,12 +258,12 @@ public class NetworkScriptHandler {
             * Create flow object in the network
             * */
             Flow newFlow = Flow.NULL_FLOW;
-
             // special case, if only one hop
             if (jsonPath.length() == 1) {
                 Server hop = netServers.get(jsonPath.getInt(0));
                 try{
                     newFlow = network.addFlow(flowName, aCurve, hop);
+                    netFlows.add(newFlow);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
