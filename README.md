@@ -137,53 +137,56 @@ Here are the authors that implemented the individual tools used in this project.
     └- README.md
     └- tool-usage.md
     └- LICENSE.txt
-    └- example/
-    │  └- example.py
-    │  └- demo.json
-    │  └- demo.xml
-    │  └- demo_report.md
-    │  └- demo_data.json
-    │  └- temp
-    │     └- ... (execution artifacts)
-    │
-    └- saihu
-    └- javapy/
-    │  └- dnc_analysis.jar
-    │  └- dnc_exe.py
-    │  └- NetworkAnalysis
-    │     └- NetArgParser.java
-    │     └- NetworkScriptHandler.java
-    │     └- NetworkAnalysis.java
-    │     └- FileGetter.java
-    │
-    └- Linear_TFA/
-    │  └- Linear_TFA.py
-    │  └- ...
-    │
-    └- xTFA/
-    │  └- ...
-    │
-    └- panco/
-    │  └- lp_solve
-    │  └- lpSolvePath.py
-    │  └- panco_analyzer.py
-    │  └- ...
-    └- netscript/
-    │  └- netdef.py
-    │  └- netscript.py
-    │  └- net_gen.py
-    │  └- unit_util.py
-    └- resources/
-    │  └- paths.json
-    └- interface.py
-    └- result.py
-    └- environment.yml
-    └- setup.py
+    └- src/
+       └- environment.yml
+       └- setup.py
+       └- main.py
+       └- example/
+       │  └- example.py
+       │  └- demo.json
+       │  └- demo.xml
+       │  └- demo_report.md
+       │  └- demo_data.json
+       │
+       └- saihu/
+          └- interface.py
+          └- result.py
+          └- javapy/
+          │  └- dnc_analysis.jar
+          │  └- dnc_exe.py
+          │  └- NetworkAnalysis
+          │     └- NetArgParser.java
+          │     └- NetworkScriptHandler.java
+          │     └- NetworkAnalysis.java
+          │     └- FileGetter.java
+          │
+          └- Linear_TFA/
+          │  └- Linear_TFA.py
+          │  └- ...
+          │
+          └- xTFA/
+          │  └- ...
+          │
+          └- panco/
+          │  └- lp_solve
+          │  └- lpSolvePath.py
+          │  └- panco_analyzer.py
+          │  └- ...
+          │
+          └- netscript/
+          │  └- netdef.py
+          │  └- netscript.py
+          │  └- net_gen.py
+          │  └- unit_util.py
+          │
+          └- resources/
+             └- paths.json
 
 ## File description
+- `setup.py`: Python package installation file.
+- `main.py`: Direct command line usage entrance point.
 - `interface.py`: The general interface to use the analysis tools. Generally speaking, user can only import function from here to access all functionalities.
 - `result.py`: The formated result class from all tools.
-- `setup.py`: Python package installation.
 - `enviornments.yml`: Python environment requirements.
 - `example/`:
     - `example.py`: Example on how to use it.
@@ -191,10 +194,10 @@ Here are the authors that implemented the individual tools used in this project.
     - `demo.xml`: A demo network definition file in physical network XML format. (more detail in [Physical Network](#physical-network))
     - `demo_report.md`: An example of formatted human-readable report.
     - `demo_data.json`: An example of formatted `json` listing results.
-- `src/`:
+- `saihu/`:
     - `javapy/`:
         - `dnc_analysis.jar`: The custom `.jar` file that can execute DNC analysis. Note that if you build a new `dnc_analysis.jar`, sometimes you may need the following command to make it executable.
-            ```
+            ```bash
             zip -d dnc_analysis.jar 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA'
             ```
         - `dnc_exe.py`: The `Python` implementation on executing `dnc_analysis.jar` and capture the results.
@@ -220,7 +223,7 @@ Here are the authors that implemented the individual tools used in this project.
 - `README.md`: This `README`
 - `tool-usage.md`: Brief description of the included tools.
 
-## Credits to Files
+## Credits to Packages
 - `NetCal/DNC`: The file `dnc_analysis.jar` is built based on the project [DNC](https://github.com/NetCal/DNC). I only implemented `NetworkAnalysis` package to allow analysing with `DNC` while using my network description file as input and my standard result format as output. More you can find more details about my input/output at [network description file](#network-description-file) and [standard result](#standard-analysis-result).
 - `xTFA`: All files under the folder `xtfa` are implemented by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en) on this [repository](https://gitlab.isae-supaero.fr/l.thomas/xtfa).
 - `panco`: Under the folder `panco`, I only implemented `panco_analyzer.py` to bridge my input/output format to panco tools. All files other than `panco_analyzer.py` and `lp_solve` are credited to [Anne Bouillard](https://ieeexplore.ieee.org/author/38526153500) with the complete project at [this repository](https://github.com/Huawei-Paris-Research-Center/panco)
@@ -348,12 +351,19 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     ```json
     "network": {
         "name": "my network",
-        "multiplexing": "FIFO",    // or "ARBITRARY"
-        "time_unit": "us",         // Default unit used in the following
-        "data_unit": "MB",         // sections if no specific unit is 
-        "rate_unit": "Gbps"        // defined along the numbers
+        "packetizer": false,
+        "multiplexing": "FIFO",
+        "analysis_options": ["IS"],
+        "time_unit": "us",
+        "data_unit": "MB",
+        "rate_unit": "Gbps"
     }
     ```
+    - `name`: Name of network
+    - `packetizer`: Whether to apply packetizer
+    - `multiplexing`: Multiplexing policy, either `FIFO` or `ARBITRARY`
+    - `analysis_option`: Additional options, takes the same arguments as `technology` in physical network format.
+    - `time_unit`/`data_unit`/`rate_unit`: Default units used in the following sections
 - `flows`: array of flows, each flow has the following attributes
     - `name`: Name of flow
     - `path`: An array to represent path of flow, written as names of servers defined in `servers`. 
@@ -365,16 +375,15 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     "flows": [
         {
             "name": "f0",
-            "path": ["s0-o0", "s1-o0"],   // output port names
+            "path": ["s0-o0", "s1-o0"],
             "arrival_curve": {
-                "bursts": [1, "5GB"],    // 1. Multiple segments
-                "rates": [10, "100Gbps"] // 2. Accept number with units or pure number (default unit will be applied)
+                "bursts": [1, "5GB"],
+                "rates": [10, "100Gbps"]
             },
             "max_packet_length": 20,
             "min_packet_length": "1B",
             "data_unit": "kB"
-        },
-        ...
+        }
     ]
     ```
 - `servers`: an array of servers, each server has the following attributes
@@ -393,8 +402,7 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
             },
             "capacity": 100,
             "rate_unit": "Gbps"
-        },
-        ...
+        }
     ]
     ```
 
@@ -425,10 +433,64 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     2. `Panco-ELP` doesn't allow cyclic dependent network.
     3. Multicast flow can only be defined as a physical network.
 
+### Command Line Exection
+Use Saihu via command line is possible with [main.py](src/main.py). Once you define a network in either of the formats mentioned in [Network Description File](#network-description-file), you can analyze your network file via the commands line tool below.
+
+#### Arguments
+
+- `networkFile`: Mandatory argument to specify path of the target network description file
+- `-h`, `--help`: print the help message
+- `-a`, `--all`: A flag to execute all tools and methods
+- `-m`, `--method`: Analyze using the methods with all tools that support these methods
+- `-t`, `--tool`: Analyze using the tools with all available methods with them
+- `-x`, `--xtfa`: Analyze using `xTFA` with methods following this argument, can be `TFA`
+- `-d`, `--dnc`: Analyze using `DNC` with methods following this argument, can be `TFA`, `SFA`, `PMOO`, `TMA`, or `LUDB`
+- `-p`, `--panco`: Analyze using `Panco` with methods following this argument, can be `TFA`, `SFA`, `PLP`, or `ELP`
+- `--shaping`: Set shaping mode as either `AUTO`, `ON` or `OFF`, by default `AUTO`
+- `-e`, `--export`: Name stem of reports to be exported, see the argument `default_name` of function [export](#export)
+- `--markdown`: Human-friendly markdown report file name
+- `--json-out`: Machine-friendly JSON report file name
+
+The priority of the arguments are different. For the arguments regarding tool/method selection, the script search the arguments in the following order: `all` > `method` > `tool` > `xtfa` = `dnc` = `panco`. If a higher priority argument is found, the rest will not be considered.
+
+For the report file related arguments, it's `markdown` = `json-out` > `export`. If non of the three arguments are specified, then it exports the result using the input file name `networkFile` as naming stem. i.e. `python main.py <filename>.<ext> ...` equals `python main.py <filename>.<ext> -e <filename> ...`
+
+All names of tools and methods are case insentisive in Saihu.
+
+#### Examples
+
+For example, you have a network description file `myNet.json`
+
+* **Select tools and methods**
+
+    ```bash
+    # Analyze with all tools and methods available
+    python main.py myNet.json -a
+    # Analyze using TFA, PLP, and LUDB with all tools supporting them
+    python main.py myNet.json -m tfa plp ludb
+    # Analyze using all methods in DNC and Panco
+    python main.py myNet.json -t dnc panco
+    # Analyze with TFA in xTFA; SFA and LUDB in DNC; and PLP in Panco
+    python main.py myNet.json -x tfa -d sfa ludb -p plp
+    ```
+
+    All the above examples generate `myNet_data.json` and `myNet_report.md`.
+
+* **Specify report file name**
+
+    ```bash
+    # Write "myname_data.json" and "myname_report.md"
+    python main.py myNet.json -a -e myname
+    # Write markdown "myMD.md"
+    python main.py myNet.json -a --markdown myMD.md
+    # Write json "myJSON.json"
+    python main.py myNet.json -a --json-out myJSON.json
+    ```
+
 ### Public Methods
-To use our general interface, you need to first import class `TSN_Analyzer` from the file `src/interface.py`.
-```
-from interface import TSN_Analyzer
+To use our general interface, you need to first import class `TSN_Analyzer` from the file `saihu/interface.py`.
+```python
+from saihu.interface import TSN_Analyzer
 ```
 Here is a list of all available methods
 * [init](#init)
@@ -446,7 +508,7 @@ Here is a list of all available methods
 
 ### Init
 An analyzer can be initialized by
-```
+```python
 analyzer = TSN_Analyzer(netfile, temp_path, shaping)
 ```
 All arguments are optional, each of them represents
@@ -455,13 +517,13 @@ All arguments are optional, each of them represents
 - `output_shaping`: A string to select output shaping mode, can be _AUTO_, _ON_, or _OFF_. Default is _AUTO_, which means to consider output shaping if possible.
 
 ### set_shaping_mode
-```
+```python
 analyzer.set_shaping_mode(mode)
 ```
 Set the output shaping usage of the analyzer by a string of either _AUTO_, _ON_, or _OFF_. _AUTO_ means considering output shaping if possible. _ON_ and _OFF_ are forcing analyzer to consider output shaping or not, and don't compute result if not possible.
 
 ### convert_netfile
-```
+```python
 outputport_net_file, physical_net_file = analyzer.convert_netfile(in_netfile, out_netfile, target)
 ```
 Convert a network description file from either physical network or output-port network and return both paths of network definition files, where one is converted from the original infile.
@@ -472,7 +534,7 @@ Convert a network description file from either physical network or output-port n
 The 2 return values are paths to the network description files, one is the output-port network and the other is the physical network.
 
 ### analyze_all
-```
+```python
 num_results = analyzer.analyze_all(methods, netfile, use_tfa, use_sfa)
 ```
 Use all available tools to do analysis given the methods. Return number of results that are computed.
@@ -484,7 +546,7 @@ All parameters are **optional**:
 The function returns the number of results loaded from the process.
 
 ### analyze_xtfa
-```
+```python
 analyzer.analyze_xtfa(methods, netfile)
 ```
 Analyze the network with `xTFA`. All parameters are optional:
@@ -492,7 +554,7 @@ Analyze the network with `xTFA`. All parameters are optional:
 - `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 
 ### analyze_linear
-```
+```python
 analyzer.analyze_linear(methods, netfile)
 ```
 Analyze the network with `Linear TFA solver`. All parameters are optional:
@@ -500,7 +562,7 @@ Analyze the network with `Linear TFA solver`. All parameters are optional:
 - `netfile`: Executing using a specific network description file, conversion is done if needed. Use the network stored in the `analyzer.netfile` if it's `None`.
 
 ### analyze_panco
-```
+```python
 analyzer.analyze_panco(methods, netfile, use_tfa, use_sfa)
 ```
 Analyze the network with `panco`. All parameters are optional:
@@ -509,7 +571,7 @@ Analyze the network with `panco`. All parameters are optional:
 - `use_tfa`/`use_sfa`: Boolean variables to select whether to use TFA/SFA bounds for improving PLP bounds. Only relevant when using PLP. Default is both `True`.
 
 ### analyze_dnc
-```
+```python
 analyzer.analyze_panco(methods, netfile)
 ```
 Analyze the network with `DNC`. All parameters are optional:
@@ -517,12 +579,12 @@ Analyze the network with `DNC`. All parameters are optional:
 - `netfile`: Executing using a specific network description file, use the one stored in the `analyzer.netfile` if it's `None`.
 
 ### export
-```
+```python
 analyzer.export(default_name, result_json, report_md, clear)
 ```
 Write the JSON result and Markdown report at the same time. All parameters are optional:
 - `default_name`: The default file name stem if either `result_json` or `report_md` are not assigned or `None`. For example,
-    ```
+    ```python
     analyzer.export("test")
     ```
     writes 2 files: `test_data.json` and `test_report.md`.
@@ -531,7 +593,7 @@ Write the JSON result and Markdown report at the same time. All parameters are o
 - `clear`: Boolean deciding whether to clear the analyzer after finishing writing. Default is `True`.
 
 ### write_result_json
-```
+```python
 analyzer.write_result_json(output_file, clear)
 ```
 Write the analyze result report from all the stored results.
@@ -539,7 +601,7 @@ Write the analyze result report from all the stored results.
 - `clear`: (Optional) Boolean deciding whether to clear the analyzer after finishing writing. Default is `True`.
 
 ### write_report_md
-```
+```python
 analyzer.write_report_md(output_file, clear)
 ```
 Write the analyze result report from all the stored results.
@@ -549,7 +611,7 @@ Write the analyze result report from all the stored results.
 
 ### clear
 Reset the analyzer.
-```
+```python
 analyzer.clear()
 ```
 
@@ -590,7 +652,7 @@ The user can choose how many flows are going into this network and the arrival/s
 Say one would like to randomly generate a network with this following switch inter-connection (source: [Deficit Round-Robin: A Second Network Calculus Analysis](https://ieeexplore.ieee.org/document/9470448)):
 <p style="text-align:center;"><img src="images/complex_net.png" alt="industrial-network" width="400"/></p>
 Then one can generate a network as follows:
-```
+```python
 connections = {
     "S1": [      "S2", "S3",                         "S8"],
     "S2": ["S1",             "S4",                   "S8"],

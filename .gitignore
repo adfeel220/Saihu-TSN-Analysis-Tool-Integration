@@ -5,3 +5,7 @@ __pycache__
 .ipynb_checkpoints
 *.lp
 *.egg-info
+ind*.json
+ind*.md
+ind*.png
+temp

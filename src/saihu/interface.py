@@ -77,13 +77,13 @@ class TSN_Analyzer:
     flow_delay_mul: str  # End-to-end Delay multiplier for all the loaded results
     backlog_mul: str  # Backlog multiplier for all the loaded results (not used)
     exec_time_mul: str  # Multiplier for execution time by each analysis
-    output_shaping: int  # Enum number to choose use shaper or not
+    shaping: int  # Enum number to choose use shaper or not
 
     def __init__(
         self,
         netfile: str = None,
         temp_path: str = os.path.abspath("./"),
-        output_shaping: str = "AUTO",
+        shaping: str = "AUTO",
     ) -> None:
         """
         Inputs:
@@ -91,7 +91,7 @@ class TSN_Analyzer:
         netfile: (Optional) [str] path to network definition file. Default is None
         jar_path: (Optional) [str] path to the directory of DNC .jar file. Default is "./javapy/"
         temp_path: (Optional) [str] path to temp (storage for computation artifacts). Default is "./"
-        output_shaping: (Optional) [str] select to use shaper or not. Default is "AUTO", can choose "ON" or "OFF" as well
+        shaping: (Optional) [str] select to use shaper or not. Default is "AUTO", can choose "ON" or "OFF" as well
         """
         self.script_handler = NetworkScriptHandler()
         self.results = list()
@@ -102,7 +102,7 @@ class TSN_Analyzer:
         self.flow_delay_mul = None
         self.backlog_mul = None
         self.exec_time_mul = None
-        self.set_shaping_mode(output_shaping)
+        self.set_shaping_mode(shaping)
 
     def clear(self) -> None:
         """Reset current analyzer"""
@@ -113,7 +113,7 @@ class TSN_Analyzer:
         self.flow_delay_mul = None
         self.backlog_mul = None
         self.exec_time_mul = None
-        self.output_shaping = FORCE_SHAPER.AUTO
+        self.shaping = FORCE_SHAPER.AUTO
 
     def set_shaping_mode(self, enforce: str) -> None:
         """
@@ -125,17 +125,17 @@ class TSN_Analyzer:
         Upper/lower case doesn't matter
         """
         if enforce.upper() == "AUTO":
-            self.output_shaping = FORCE_SHAPER.AUTO
+            self.shaping = FORCE_SHAPER.AUTO
         elif enforce.upper() == "ON":
-            self.output_shaping = FORCE_SHAPER.ON
+            self.shaping = FORCE_SHAPER.ON
         elif enforce.upper() == "OFF":
-            self.output_shaping = FORCE_SHAPER.OFF
+            self.shaping = FORCE_SHAPER.OFF
         else:
             # Default as "AUTO"
             print(
                 f"No such shaper enforcement {enforce}, must in {list(FORCE_SHAPER)} ignore"
             )
-            self.output_shaping = FORCE_SHAPER.AUTO
+            self.shaping = FORCE_SHAPER.AUTO
 
     def export(
         self,
@@ -386,7 +386,7 @@ class TSN_Analyzer:
                 mdFile.new_line(
                     mdFile.new_reference_image(
                         text="Network graph",
-                        path=f"./{net_name}_topo.png",
+                        path=os.path.join(".", f"{net_name}_topo.png"),
                         reference_tag="topo",
                     )
                 )
@@ -483,13 +483,10 @@ class TSN_Analyzer:
                 print(f'Skip, no such method "{mthd}" for xTFA')
                 continue
 
-            if (
-                self.output_shaping == FORCE_SHAPER.AUTO
-                or self.output_shaping == FORCE_SHAPER.ON
-            ):
+            if self.shaping == FORCE_SHAPER.AUTO or self.shaping == FORCE_SHAPER.ON:
                 include_tech = ["IS"]
                 exclude_tech = ["ARBITRARY"]  # not a wopanet command
-            elif self.output_shaping == FORCE_SHAPER.OFF:
+            elif self.shaping == FORCE_SHAPER.OFF:
                 include_tech = []
                 exclude_tech = ["IS", "ARBITRARY"]
 
@@ -638,11 +635,11 @@ class TSN_Analyzer:
 
             # solve and time measuring
             start_time = time()
-            if self.output_shaping == FORCE_SHAPER.AUTO:
+            if self.shaping == FORCE_SHAPER.AUTO:
                 delays = linear_solver.solve()
-            elif self.output_shaping == FORCE_SHAPER.ON:
+            elif self.shaping == FORCE_SHAPER.ON:
                 delays = linear_solver.solve_tfa_pp()
-            elif self.output_shaping == FORCE_SHAPER.OFF:
+            elif self.shaping == FORCE_SHAPER.OFF:
                 delays = linear_solver.solve_tfa()
             exec_time = time() - start_time
 
@@ -737,11 +734,11 @@ class TSN_Analyzer:
         -------------
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
-        methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method.
+        methods: (Optional) [list | str] List of "TFA", "SFA", "PLP", or "ELP", or a single string of one of the method.
                  Default is None, it executes all available methods
         """
         if methods is None:
-            methods = ["TFA", "SFA", "PLP"]
+            methods = ["TFA", "SFA", "PLP", "ELP"]
         netfile, methods = self._arg_check(netfile, methods, "json")
 
         for mthd in methods:
@@ -760,8 +757,7 @@ class TSN_Analyzer:
 
             panco_anzr = panco_analyzer(netfile)
             output_shaping = (
-                self.output_shaping == FORCE_SHAPER.AUTO
-                or self.output_shaping == FORCE_SHAPER.ON
+                self.shaping == FORCE_SHAPER.AUTO or self.shaping == FORCE_SHAPER.ON
             )
             panco_anzr.build_network(output_shaping)
 
@@ -864,11 +860,11 @@ class TSN_Analyzer:
         -------------
         netfile: (Optional) [str] File name of the network definition, must in either WOPANet XML format or output-port JSON.
                  Default is to select the netfile stored in the class, raise error if both are not defined.
-        methods: (Optional) [list | str] List of "TFA", "SFA", or "PLP", or a single string of one of the method. Ignores "PLP"
+        methods: (Optional) [list | str] List of "TFA", "SFA", "PMOO", "TMA" or "LUDB", or a single string of one of the method.
                  Default is None, it executes all available methods
         """
         if methods is None:
-            methods = ["TFA", "SFA"]  # PMOO & TMA very slow so only execute on demand
+            methods = ["TFA", "SFA", "PMOO", "TMA", "LUDB"]
         netfile, methods = self._arg_check(netfile, methods, "json")
 
         # result is a UTF-8 string containing json format of result separated by flows
@@ -896,13 +892,13 @@ class TSN_Analyzer:
                 for mid in range(len(executable_methods)):
                     if executable_methods[mid] in {"PMOO", "TMA"}:
                         if (
-                            self.output_shaping == FORCE_SHAPER.AUTO
-                            or self.output_shaping == FORCE_SHAPER.ON
+                            self.shaping == FORCE_SHAPER.AUTO
+                            or self.shaping == FORCE_SHAPER.ON
                         ):
                             executable_methods[mid] += "++"
                 methods = executable_methods
 
-        if self.output_shaping == FORCE_SHAPER.ON:
+        if self.shaping == FORCE_SHAPER.ON:
             print("Skip. DNC doesn't support FIFO analysis with shaper")
 
         # determine if network is cyclic
@@ -926,7 +922,6 @@ class TSN_Analyzer:
         if len(result_by_methods) == 0:
             print("Skip DNC analysis")
             return
-            # raise RuntimeError("No result obtained from DNC solver!")
 
         # extract result obtained by each method
         for method, res_per_method in result_by_methods.items():
@@ -996,6 +991,9 @@ class TSN_Analyzer:
                 )
                 max_backlogs.append(float(res_per_flow["max_backlog"]))
                 result["exec_time"] += res_per_flow["exec_time"]
+
+            if len(result["server_delays"]) == 0:
+                result["server_delays"] = None
 
             # determine delay multiplier
             min_mul = unit_util.decide_min_multiplier(
@@ -1343,8 +1341,14 @@ class TSN_Analyzer:
             multiplier = self.backlog_mul
             unit = "bit"
 
+        # Skip if no results need to be printed
         if all([getattr(res, attr_name) is None for res in tm_results.values()]):
             return
+        non_empty_results = {
+            key: res
+            for key, res in tm_results.items()
+            if getattr(res, attr_name) is not None
+        }
 
         mdFile.new_header(level=2, title=f"Per server {title_name} bound")
         mul, unit = unit_util.split_multiplier_unit(self._units["server_delay"])
@@ -1353,11 +1357,12 @@ class TSN_Analyzer:
                 m=unit_util.multiplier_names[mul], u=unit_util.time_unit_names[unit]
             )
         )
-        # mdFile.new_line(f"Unit in {unit_util.multiplier_names[multiplier]}{unit}")
 
         # Table with mapping assigned
-        server_mapping = self._create_mapping(tm_results.values(), ["graph", "nodes"])
-        tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
+        server_mapping = self._create_mapping(
+            non_empty_results.values(), ["graph", "nodes"]
+        )
+        tlm_mapping = dict(zip(non_empty_results.keys(), range(len(non_empty_results))))
         table_res = np.empty(
             (len(server_mapping) + 2, len(tlm_mapping) + 2), dtype="object"
         )
@@ -1371,7 +1376,7 @@ class TSN_Analyzer:
         # Minimum value
         min_val = np.ones((len(server_mapping), len(tlm_mapping))) * np.inf
 
-        for tlm, res in tm_results.items():
+        for tlm, res in non_empty_results.items():
             # When nothing is written in the result class
             if getattr(res, attr_name) is None:
                 continue
