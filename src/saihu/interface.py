@@ -139,7 +139,7 @@ class TSN_Analyzer:
 
     def export(
         self,
-        default_name: str = "result",
+        default_name: str = None,
         result_json: str = None,
         report_md: str = None,
         clear: bool = True,
@@ -156,6 +156,10 @@ class TSN_Analyzer:
         report_md : [str] File name for markdown report file
         clear : [bool] Whether to clear the buffer after writing results. Default is True
         """
+        if default_name is None:
+            default_name = os.path.basename(os.path.normpath(self.netfile)).rsplit(
+                ".", 1
+            )[0]
         if result_json is None:
             result_json = add_text_in_ext(default_name, "data")
         result_json = check_file_ext(result_json, "json")

@@ -588,6 +588,9 @@ Write the JSON result and Markdown report at the same time. All parameters are o
     analyzer.export("test")
     ```
     writes 2 files: `test_data.json` and `test_report.md`.
+    
+    If no default name is specified, it takes the name of network description file without file extension. e.g. a network description file `my_net.json` writes `my_net_data.json` and `my_net_report.md` with no default name is specified.
+    
 - `result_json`: The file name of the JSON output
 - `report_md`: The file name of the Markdown report
 - `clear`: Boolean deciding whether to clear the analyzer after finishing writing. Default is `True`.

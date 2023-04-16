@@ -1,6 +1,6 @@
 # Description: Command line tool to access SAIHU
 
-from os.path import abspath, join, exists, dirname, basename, normpath
+from os.path import abspath, join, exists, dirname
 from os import makedirs
 from argparse import ArgumentParser, Namespace
 
@@ -62,7 +62,7 @@ def parse_args() -> Namespace:
     )
     arg_parser.add_argument("--markdown", help="Name of markdown report file")
     arg_parser.add_argument("--json-out", help="Name of JSON report file")
-    
+
     return arg_parser.parse_args()
 
 
@@ -103,11 +103,5 @@ if __name__ == "__main__":
         analyzer.write_result_json(args.json_out)
     elif args.export is None and args.markdown is not None and args.json_out is None:
         analyzer.write_report_md(args.markdown)
-    elif args.export is None:
-        analyzer.export(
-            basename(normpath(args.networkFile)).rsplit(".", 1)[0],
-            args.json_out,
-            args.markdown,
-        )
     else:
         analyzer.export(args.export, args.json_out, args.markdown)
