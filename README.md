@@ -238,7 +238,7 @@ pip install -e .
 
 ## Requirements
 - `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
-- `cplex`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency.
+- `CPLEX`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency. Once you install `CPLEX` on your device, please specify its folder containing CPLEX executable in `cplex` inside [`resources/paths.json`](./src/saihu/resources/paths.json).
 - `Java`: `JDK 16.0.2`
 - `Python`: Create an environment using `environment.yml` or installing `numpy`, `networkx`, `matplotlib`, `pulp`, and `mdutils` with `Python>=3.8`.
 
@@ -248,7 +248,7 @@ You may also choose to not install the environment if you choose not to use all 
 - `panco`: Requires `Python`/`lpsolve`/`panco package`
 - `Linear TFA`: Requires `Python`/`pulp`
 - `xTFA`: Requires `Python`/`xtfa package`
-- `DNC`: Requires `Java` with `JDK 16` and `cplex` if you want to use `LUDB`.
+- `DNC`: Requires `Java` with `JDK 16` and `CPLEX` if you want to use `LUDB`.
 
 # How to Use
 You need to write your network in one of the network description format specified below. Then use the Python interface to do the analysis.
@@ -590,7 +590,7 @@ Write the JSON result and Markdown report at the same time. All parameters are o
     writes 2 files: `test_data.json` and `test_report.md`.
     
     If no default name is specified, it takes the name of network description file without file extension. e.g. a network description file `my_net.json` writes `my_net_data.json` and `my_net_report.md` with no default name is specified.
-    
+
 - `result_json`: The file name of the JSON output
 - `report_md`: The file name of the Markdown report
 - `clear`: Boolean deciding whether to clear the analyzer after finishing writing. Default is `True`.

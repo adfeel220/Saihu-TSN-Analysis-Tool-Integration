@@ -157,12 +157,15 @@ class TSN_Analyzer:
         clear : [bool] Whether to clear the buffer after writing results. Default is True
         """
         if default_name is None:
+            # Get file name without parent directories and extention
             default_name = os.path.basename(os.path.normpath(self.netfile)).rsplit(
                 ".", 1
             )[0]
+        # Create <default_name>_data.json
         if result_json is None:
             result_json = add_text_in_ext(default_name, "data")
         result_json = check_file_ext(result_json, "json")
+        # Create <default_name>_report.md
         if report_md is None:
             report_md = add_text_in_ext(default_name, "report")
         report_md = check_file_ext(report_md, "md")
@@ -299,7 +302,7 @@ class TSN_Analyzer:
         output_index = 0
         # We summarize one output file for each network
         for net_name, res in networks.items():
-            # sort results by "tool-method" in alphabetical order
+            # Results are named as "tool-method" but they are sorted by "method/tool" in alphabetical order
             res_sorted = dict(
                 zip(["{m}{t}".format(t=r.tool, m=r.method) for r in res], res)
             )
@@ -314,6 +317,7 @@ class TSN_Analyzer:
                 )
             )
 
+            # Obtain smallest unit as the unit of display (less decimal points)
             self._units = self._get_smallest_unit(res)
             self._units = {
                 "flow_delay": "{m}{u}".format(
@@ -350,13 +354,6 @@ class TSN_Analyzer:
 
             # Server delays / backlogs
             self._build_server_result_table(mdFile, res_sorted, "delay")
-            ## 2022.11.26 : Since only DNC returns backlog data, remove printing backlog
-            #####################################
-            # # check if there's any backlog data
-            # backlog_mapping = self._create_mapping(res, "server_backlogs")
-            # if len(backlog_mapping) > 0:
-            #     self._build_server_result_table(mdFile, res_by_methods, "backlog")
-            #####################################
 
             # Tool-method execution time
             mdFile.new_header(level=2, title="Execution Time")
@@ -374,6 +371,7 @@ class TSN_Analyzer:
                 f"There are **{res[0].num_servers}** servers and **{res[0].num_flows}** flows in the system."
             )
             # topology
+            # select originally defined topology to avoid conversion problem
             graph = None
             for r in res:
                 if r.graph is not None and not r.is_converted():
@@ -395,24 +393,12 @@ class TSN_Analyzer:
                     )
                 )
 
-            # Flow path
+            # Network info
             self._build_flow_paths(mdFile, res_sorted)
-
-            # utility
             self._build_utility_map(mdFile, res_sorted)
 
-            ## 2022.12.15 : Decide to remove all information that can be obtained by post-processing
-            #####################################
-            ## Per flow result
-            # mdFile.new_header(level=1, title="Delay from source through flow paths")
-            # for foi in res[0].flow_paths.keys():
-            #     self._build_flow_result_table(mdFile, res_sorted, foi)
-            #####################################
-
-            # Create table of contents
-            mdFile.new_table_of_contents(table_title="Table of Contents", depth=2)
-
             # Finally create the output file
+            mdFile.new_table_of_contents(table_title="Table of Contents", depth=2)
             mdFile.create_md_file()
 
         # Clear the current results
