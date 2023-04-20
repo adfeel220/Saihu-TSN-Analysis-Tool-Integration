@@ -31,24 +31,24 @@ Unit in microsecond
 ## Per server delay bound
   
 Unit in microsecond
-|server name|Panco-ELP|DNC-LUDB|Panco-PLP|DNC-PMOO|DNC-SFA|xTFA-TFA|Minimum (best)|
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|s0-o0|N/A|N/A|N/A|N/A|N/A|50.000|50.000|
-|s1-o0|N/A|N/A|N/A|N/A|N/A|49.324|49.324|
-|s1-o1|N/A|N/A|N/A|N/A|N/A|29.322|29.322|
-|Total|N/A|0.000|N/A|0.000|0.000|128.646|128.646|
+|server name|xTFA-TFA|Minimum (best)|
+| :---: | :---: | :---: |
+|s0-o0|50.000|50.000|
+|s1-o0|49.324|49.324|
+|s1-o1|29.322|29.322|
+|Total|128.646|128.646|
 
 ## Execution Time
   
 Unit in millisecond
-|method\tool|DNC|Panco|xTFA|
-| :---: | :---: | :---: | :---: |
-|ELP|N/A|130.085|N/A|
-|LUDB|189.000|N/A|N/A|
-|PLP|N/A|142.683|N/A|
-|PMOO|8.000|N/A|N/A|
-|SFA|11.000|N/A|N/A|
-|TFA|N/A|N/A|6.002|
+|tool-method|Execution Time|
+| :---: | :---: |
+|Panco-ELP|123.159|
+|DNC-LUDB|202.000|
+|Panco-PLP|139.048|
+|DNC-PMOO|16.000|
+|DNC-SFA|13.000|
+|xTFA-TFA|5.334|
 
 # Network Information
 

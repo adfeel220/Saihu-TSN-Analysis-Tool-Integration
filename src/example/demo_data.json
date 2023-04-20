@@ -38,12 +38,12 @@
         }
     },
     "execution_time": {
-        "xTFA_TFA": 6.001949310302734,
-        "Panco_PLP": 142.6827907562256,
-        "Panco_ELP": 130.08499145507812,
-        "DNC_SFA": 11.0,
-        "DNC_PMOO": 8.0,
-        "DNC_LUDB": 189.0
+        "xTFA_TFA": 5.334138870239258,
+        "Panco_PLP": 139.04809951782227,
+        "Panco_ELP": 123.15893173217773,
+        "DNC_SFA": 13.0,
+        "DNC_PMOO": 16.0,
+        "DNC_LUDB": 201.99999999999997
     },
     "units": {
         "flow_delay": "us",

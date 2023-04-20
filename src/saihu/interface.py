@@ -1244,7 +1244,6 @@ class TSN_Analyzer:
             )
         )
 
-        paths = dict()
         tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
         flow_mapping = self._create_mapping(tm_results.values(), "flow_delays")
         table_res = np.empty(
@@ -1261,7 +1260,6 @@ class TSN_Analyzer:
         min_delay = np.ones((len(flow_mapping), len(tlm_mapping))) * np.inf
 
         for tlm, res in tm_results.items():
-            paths.update(res.flow_paths)
             for flow_name, flow_delay in res.flow_delays.items():
                 # The number to be written
                 delay_written = flow_delay * unit_util.get_time_unit(
@@ -1272,7 +1270,6 @@ class TSN_Analyzer:
                     flow_mapping[flow_name] + 1, tlm_mapping[tlm] + 1
                 ] = "{:.3f}".format(delay_written)
                 min_delay[flow_mapping[flow_name], tlm_mapping[tlm]] = delay_written
-                # table_res[flow_mapping[flow_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(flow_delay / unit_util.multipliers[self.flow_delay_mul])
 
         # Write minimum value
         table_res[1:, -1] = ["{:.3f}".format(v) for v in np.min(min_delay, axis=1)]
@@ -1378,7 +1375,6 @@ class TSN_Analyzer:
                 table_res[
                     server_mapping[server_name] + 1, tlm_mapping[tlm] + 1
                 ] = "{:.3f}".format(val)
-                # table_res[server_mapping[server_name]+1, tlm_mapping[tlm]+1] = "{:.3f}".format(attr_num / unit_util.multipliers[multiplier])
                 min_val[server_mapping[server_name], tlm_mapping[tlm]] = val
 
             summary = getattr(res, summary_attr)
@@ -1391,7 +1387,6 @@ class TSN_Analyzer:
                         res.time_unit, self._units["server_delay"]
                     )
                 )
-                # table_res[-1,tlm_mapping[tlm]+1] = "{:.3f}".format(summary/unit_util.multipliers[multiplier])
 
         # Write minimum value
         min_val = np.min(min_val, axis=1)
@@ -1404,62 +1399,6 @@ class TSN_Analyzer:
             rows=len(server_mapping) + 2, columns=len(tlm_mapping) + 2, text=table_res
         )
 
-    def _build_flow_result_table(
-        self, mdFile: mdu, tm_results: dict, flow_of_interest: str
-    ) -> None:
-        """
-        Build a flow result table on flow_of_interest over mdFile using result_dict
-
-        Inputs:
-        ---------
-        mdFile: the markdown file to write
-        tm_results: a dictionary with key="tool-method", value=corresponding result
-        flow_of_interest: the name of flow to print
-        """
-        if all([res.flow_cmu_delays is None for res in tm_results.values()]):
-            return
-
-        mdFile.new_header(level=2, title=f'Flow "{flow_of_interest}"')
-        mdFile.new_line(
-            "The server names in the table is written according to the path of flow"
-        )
-        path = next(iter(tm_results.values())).flow_paths[flow_of_interest]
-
-        mdFile.new_header(
-            level=3,
-            title=f'Delay experienced from source to each node in flow "{flow_of_interest}"',
-        )
-        mdFile.new_line(
-            f"Unit in {unit_util.multiplier_names[self.serv_delay_mul]}seconds"
-        )
-
-        # Table as a numpy array with initial value ""
-        tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
-        table_res = np.empty((len(path) + 1, len(tlm_mapping) + 1), dtype="object")
-        table_res[:] = ""
-
-        # column labels
-        table_res[0, :] = ["server name", *tlm_mapping.keys()]
-        # row labels
-        table_res[1:, 0] = path
-
-        # fill in the contents
-        for tlm, res in tm_results.items():
-            if res.flow_cmu_delays is None:
-                continue
-            vals = (
-                np.array(res.flow_cmu_delays[flow_of_interest])
-                / unit_util.multipliers[self.serv_delay_mul]
-            )
-            if len(vals) > 0:
-                table_res[1:, tlm_mapping[tlm] + 1] = list(map("{:.3f}".format, vals))
-
-        # write into MD
-        table_res = table_res.flatten().tolist()
-        mdFile.new_table(
-            rows=len(path) + 1, columns=len(tlm_mapping) + 1, text=table_res
-        )
-
     def _build_exec_time_table(self, mdFile: mdu, tm_results: dict) -> None:
         """
         Build a table of execution time of each tool/method pair
@@ -1470,45 +1409,34 @@ class TSN_Analyzer:
         tm_results: a dictionary with key="tool-method", value=corresponding result
         """
 
-        result_method_dict = dict()
-        for r in tm_results.values():
-            if r.method not in result_method_dict:
-                result_method_dict[r.method] = list()
-            result_method_dict[r.method].append(r)
-
+        # Show printed unit
         mdFile.new_line(
             f"Unit in {unit_util.multiplier_names[self.exec_time_mul]}second"
         )
 
-        tools = set()
-        for ress in result_method_dict.values():
-            for r in ress:
-                tools.add(r.tool)
-        tool_mapping = dict(zip(sorted(list(tools)), range(len(tools))))
+        # Table as a numpy array with initial value ""
+        tlm_mapping = dict(zip(tm_results.keys(), range(len(tm_results))))
+        table_exec_time = np.empty((len(tlm_mapping) + 1, 2), dtype="object")
+        table_exec_time[:] = ""
 
-        table_perv = np.empty(
-            (len(result_method_dict) + 1, len(tool_mapping) + 1), dtype="object"
-        )
-        table_perv[:] = ""
+        # Column labels
+        table_exec_time[0, :] = ["tool-method", "Execution Time"]
         # row labels
-        table_perv[:, 0] = ["method\\tool", *result_method_dict.keys()]
-        # column labels
-        table_perv[0, 1:] = list(tool_mapping.keys())
+        table_exec_time[1:, 0] = list(tlm_mapping.keys())
 
-        # fill in the contents
-        for mid, res_same_method in enumerate(result_method_dict.values()):
-            for res in res_same_method:
-                if res.exec_time is not None:
-                    table_perv[mid + 1, tool_mapping[res.tool] + 1] = "{:.3f}".format(
-                        res.exec_time / unit_util.multipliers[self.exec_time_mul]
-                    )
+        # Write table execution time content
+        for tlm, res in tm_results.items():
+            if res.exec_time is not None:
+                table_exec_time[tlm_mapping[tlm] + 1, 1] = "{:.3f}".format(
+                    res.exec_time / unit_util.multipliers[self.exec_time_mul]
+                )
 
         # write into MD
-        table_perv = table_perv.flatten().tolist()
+        table_exec_time = table_exec_time.flatten().tolist()
         mdFile.new_table(
-            rows=len(result_method_dict) + 1,
-            columns=len(tool_mapping) + 1,
-            text=table_perv,
+            rows=len(tlm_mapping) + 1,
+            columns=2,
+            text=table_exec_time,
         )
 
     def _build_utility_map(self, mdFile: mdu, tm_results: dict) -> None:
