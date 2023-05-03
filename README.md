@@ -1,4 +1,4 @@
-Saihu: A Common Interface for Worst-Case Delay Analysis of Time-Sensitive Networks
+Saihu: A Common Interface of Worst-Case Delay Analysis Tools for Time-Sensitive Networks
 =======================
 Author: Chun-Tso Tsai
 
