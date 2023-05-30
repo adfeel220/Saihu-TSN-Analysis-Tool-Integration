@@ -730,9 +730,13 @@ class TSN_Analyzer:
         if methods is None:
             methods = ["TFA", "SFA", "PLP", "ELP"]
         netfile, methods = self._arg_check(netfile, methods, "json")
+        print(
+            f'Analyzing "{netfile}" using Panco-{",".join(methods)}...',
+            end="",
+            flush=True,
+        )
 
         for mthd in methods:
-            print(f'Analyzing "{netfile}" using panco-{mthd}...', end="", flush=True)
             if mthd not in {"TFA", "SFA", "PLP", "ELP"}:
                 print(f'Skip, no such method "{mthd}" for PLP solver')
                 continue
@@ -838,7 +842,7 @@ class TSN_Analyzer:
             )
             self.results.append(result)
 
-            print("Done")
+        print("Done")
 
     def analyze_dnc(
         self, methods: Union[list, str] = None, netfile: str = None

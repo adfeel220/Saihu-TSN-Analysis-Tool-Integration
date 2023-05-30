@@ -66,7 +66,7 @@ def parse_args() -> Namespace:
     return arg_parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
 
     temp_path = abspath(join(dirname(__file__), "temp"))
@@ -98,6 +98,10 @@ if __name__ == "__main__":
         if args.panco is not None:
             analyzer.analyze_panco(methods=args.panco)
 
+    if len(analyzer.results) == 0:
+        print("Skip. No analysis tool/method is specified")
+        return
+
     # output
     if args.export is None and args.markdown is None and args.json_out is not None:
         analyzer.write_result_json(args.json_out)
@@ -105,3 +109,7 @@ if __name__ == "__main__":
         analyzer.write_report_md(args.markdown)
     else:
         analyzer.export(args.export, args.json_out, args.markdown)
+
+
+if __name__ == "__main__":
+    main()
