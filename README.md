@@ -60,6 +60,8 @@ Table of Contents
 # Introduction
 **Time-Sensitive Networking (TSN)** analysis focuses on giving deterministic delay or backlog guarantees. This project integrates 4 different TSN analysis tools, including `Linear TFA Solver`, [NetCal/DNC](https://github.com/NetCal/DNC), [xTFA](https://gitlab.isae-supaero.fr/l.thomas/xtfa), and [panco](https://github.com/Huawei-Paris-Research-Center/panco). The users can use a common interface to compute network delay bounds obtained by different tools, and write the results into a formated report. All these actions requires only a few lines of code.
 
+A introductory video of the Saihu project is available on [YouTube](https://youtu.be/MiOhLay8Kr4).
+
 The name **SAIHU** comes from **S**uperimposed worst-case delay **A**nalysis **I**nterface for **H**uman-friendly **U**sage." It’s also inspired by the Taiwanese word ‘師傅 (sai-hū)’, which means a master, an expert, or a qualified worker.
 
 ## Cite this project
