@@ -270,7 +270,8 @@ This network consists of
 - 6 links: Labelled as grey cylinders.
 
 Each source of flow (`src[x]`) provides data flow modelled as an arrival curve composed of token-bucket curves; while each output port provides service to process these data with a service curve composed of rate-latency curves.
-A **Physical Network** aims at directly describing the above network
+
+A **Physical Network** aims at directly describing the above network.
 
 On the other hand, since the delay are mostly caused by data flows competing the resource of output ports, we can directly model the network as output ports as follows
 <p style="text-align:center;"><img src="images/op_net.png" alt="output-port-network" width="300"/></p>
@@ -326,7 +327,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     - `lb-rate`: arrival rate of leady-bucket curve. Can assign different rate units, `Mbps`... (But not `bps` alone)
     - `source`: The source of this flow, must be a station or switch.
     
-    A `flow` element can have multiple paths, it is then treated as separated flows with the same arrival parameters.
+    A `flow` element can have multiple paths thus representing a _multicast_ flow. Note that only the physical network format supports defining multicast flow.
     - `target`: Each target is a path, can assign a `name` to it. A list of nodes is written as its sub-element-tree. Each node is specified by a `path` entry with attribute `node` equals to a station/switch.
 
     Example:
@@ -388,6 +389,9 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
         }
     ]
     ```
+
+    Note that all flows in the output port format are assumed to be _unicast_ flows. If it's converted from a physical network with multicast flows, the multicast paths will be split into multiple unicast flows with the same arrival curve and source.
+
 - `servers`: an array of servers, each server has the following attributes
     - `name`: Name of server
     - `service_curve`: A multi-segment curve, which has 2 attributes `latencies` and `rates`. Both attributes must have the same length. Latency and service rate with the same index correspond to a rate-latency curve. The final service curve is the maximum of all these curves.
