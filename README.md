@@ -87,7 +87,18 @@ From the bottom up, users have the option to use the interface according to the 
 ## Credit
 Here are the authors that implemented the individual tools used in this project.
 - `Linear TFA Solver`: I implemented it myself following the TFA algorithm used in [Trade-off between accuracy and tractability of Network Calculus in FIFO networks](https://doi.org/10.1016/j.peva.2021.102250).
-- `xTFA`: This tool is implemented in `Python` by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en).
+- `xTFA`: This tool is implemented in `Python` by [Ludovic Thomas](https://people.epfl.ch/ludovic.thomas/?lang=en). You may refer to the following academic reference:
+    ```bibtex
+    @PHDTHESIS{thoma2022analyse,
+        url = "http://www.theses.fr/2022ESAE0041",
+        title = "Analysis of the side-effects on latency bounds of combinations of scheduling, redundancy and synchronization mechanisms in time-sensitive networks",
+        author = "Thomas, Ludovic",
+        year = "2022",
+        note = "Thèse de doctorat dirigée par Mifdaoui, Ahlem et Le Boudec, Jean-Yves Informatique et Télécommunications Toulouse, ISAE 2022",
+        school = "l'Institut Supérieur de l'Aéronautique et de l'Espace (ISAE-SUPAERO)"
+    }
+    ```
+
 - `NetCal/DNC`: This tool is implemented in `JAVA` by the NetCal team. You can visit [their repository](https://github.com/NetCal/DNC) and here are the academic references:
     - Arbitrary Multiplexing:
     ```bibtex
@@ -242,11 +253,11 @@ pip install -e .
 - `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
 - `CPLEX`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency. Once you install `CPLEX` on your device, please specify its folder containing CPLEX executable in `cplex` inside [`resources/paths.json`](./src/saihu/resources/paths.json).
 - `Java`: `JDK 16.0.2`
-- `Python`: Create an environment using `environment.yml` or installing `numpy`, `networkx`, `matplotlib`, `pulp`, and `mdutils` with `Python>=3.8`.
+- `Python`: Create an environment using `environment.yml` or installing `numpy`, `networkx`, `matplotlib`, `pulp`, and `mdutils` with `Python>=3.9`.
 
 ## Dependencies
 You may also choose to not install the environment if you choose not to use all tools included in this module. Here are the list of dependency to each tool, you may refer to this list to decide which environment setting you need.
-- `Saihu`: This is a **MUST-HAVE** to use the interface. Requires `Python>=3.8`/`numpy`/`networkx`/`matplotlib`/`mdutils`
+- `Saihu`: This is a **MUST-HAVE** to use the interface. Requires `Python>=3.9`/`numpy`/`networkx`/`matplotlib`/`mdutils`
 - `panco`: Requires `Python`/`lpsolve`/`panco package`
 - `Linear TFA`: Requires `Python`/`pulp`
 - `xTFA`: Requires `Python`/`xtfa package`
@@ -444,7 +455,7 @@ Use Saihu via command line is possible with [main.py](src/main.py). Once you def
 
 #### Arguments
 
-- `networkFile`: Mandatory argument to specify path of the target network description file
+- `networkFile`: Mandatory positional argument to specify path of the target network description file
 - `-h`, `--help`: print the help message
 - `-a`, `--all`: A flag to execute all tools and methods
 - `-m`, `--method`: Analyze using the methods with all tools that support these methods
@@ -723,7 +734,13 @@ The above code generates 30 flows within the given topology, and dump the output
 
 
 # Example
-You may check [example.py](./example/example.py) for the simple example. Here I present the basic usage.
+
+The simplest way to use Saihu is via command line tool using [main.py](./src/main.py) with flag `-a` (analyze with all methods and tools).
+```bash
+python main.py -a
+```
+
+To use Saihu as a Python package, please check [example.py](./example/example.py) for the simple example. Here I present the basic usage.
 ```python
 from saihu.interface import TSN_Analyzer
 
