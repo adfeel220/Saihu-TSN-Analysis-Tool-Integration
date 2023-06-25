@@ -3,7 +3,6 @@ package NetworkAnalysis;
 import NetworkAnalysis.FileGetter;
 
 import org.networkcalculus.dnc.AnalysisConfig;
-import org.networkcalculus.dnc.network.server_graph.Path;
 import org.networkcalculus.dnc.tandem.analyses.*;
 import org.networkcalculus.num.Num;
 import org.networkcalculus.dnc.network.server_graph.Flow;
@@ -13,6 +12,7 @@ import org.networkcalculus.dnc.network.server_graph.Server;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
+import java.io.IOException;
 import java.util.Set;
 import java.util.Map;
 
@@ -46,21 +46,25 @@ public class NetworkAnalysis {
             netScript.parse(fpath);
 
             for (AnalysisTool tool : argParser.getTools()) {
-                analysis(tool);
+                try {
+                    analysis(tool);
+                } catch (Exception e) {
+                    continue;
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void analysis(AnalysisTool tool) {
+    public static void analysis(AnalysisTool tool) throws Exception {
         for (Flow foi : netScript.getFlows()) {
             analysis(tool, foi);
         }
     }
 
     /* Perform analysis based on the selected tool and F.O.I (Flow of interest) */
-    public static void analysis(AnalysisTool tool, Flow foi) {
+    public static void analysis(AnalysisTool tool, Flow foi) throws Exception{
 
         AnalysisConfig config = new AnalysisConfig();
         // Determine multiplexing technique
@@ -87,7 +91,7 @@ public class NetworkAnalysis {
                 TotalFlowAnalysis tfa = new TotalFlowAnalysis(sg, config);
 
                 // Run and print in JSON format
-                try{
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     tfa.performAnalysis(foi);
@@ -163,9 +167,6 @@ public class NetworkAnalysis {
 
                     System.out.println(result);
 
-                } catch (Exception e) {
-                    System.out.println("TFA analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -177,7 +178,7 @@ public class NetworkAnalysis {
                 TotalFlowAnalysis tfapp = new TotalFlowAnalysis(sg, config);
 
                 // Run and print
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     tfapp.performAnalysis(foi);
@@ -252,9 +253,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("TFA++ analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -266,7 +264,7 @@ public class NetworkAnalysis {
                 SeparateFlowAnalysis sfa = new SeparateFlowAnalysis(sg, config);
 
                 // Run and print
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     sfa.performAnalysis(foi);
@@ -310,9 +308,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("SFA analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -324,7 +319,7 @@ public class NetworkAnalysis {
                 SeparateFlowAnalysis sfapp = new SeparateFlowAnalysis(sg, config);
 
                 // Run and print
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     sfapp.performAnalysis(foi);
@@ -368,9 +363,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("SFA analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -383,7 +375,7 @@ public class NetworkAnalysis {
                 PmooAnalysis pmoo = new PmooAnalysis(sg, config);
 
                 // Run and print
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     pmoo.performAnalysis(foi);
@@ -427,9 +419,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("PMOO analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -442,7 +431,7 @@ public class NetworkAnalysis {
                 PmooAnalysis pmoopp = new PmooAnalysis(sg, config);
 
                 // Run and print
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     pmoopp.performAnalysis(foi);
@@ -486,9 +475,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("PMOO++ analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -501,7 +487,7 @@ public class NetworkAnalysis {
                 TandemMatchingAnalysis tma = new TandemMatchingAnalysis(sg, config);
 
                 // Run and write
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     tma.performAnalysis(foi);
@@ -545,9 +531,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("TMA analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -560,7 +543,7 @@ public class NetworkAnalysis {
                 TandemMatchingAnalysis tmapp = new TandemMatchingAnalysis(sg, config);
 
                 // Run and write
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     tmapp.performAnalysis(foi);
@@ -611,9 +594,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("TMA++ analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -625,7 +605,7 @@ public class NetworkAnalysis {
                 FIFOTandemAnalysis ludb = new FIFOTandemAnalysis(sg, config);
 
                 // Run and write
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     ludb.performAnalysis(foi);
@@ -673,12 +653,9 @@ public class NetworkAnalysis {
                     result.put("flow_paths", flow_path);
                     result.put("flow_cmu_delays", flow_cmu_delay);
                     result.put("flow_delays", totalDelayDouble);
-                    result.put("exec_time", exec_time/1000.0);
+                    result.put("exec_time", exec_time / 1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("LUDB analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 
@@ -690,7 +667,7 @@ public class NetworkAnalysis {
                 FIFOTandemAnalysis ludbpp = new FIFOTandemAnalysis(sg, config);
 
                 // Run and write
-                try {
+                {
                     // perform analysis and measure the execution time
                     long startTime = System.currentTimeMillis();
                     ludbpp.performAnalysis(foi);
@@ -741,9 +718,6 @@ public class NetworkAnalysis {
                     result.put("exec_time", exec_time/1000.0);
 
                     System.out.println(result);
-                } catch (Exception e) {
-                    System.out.println("LUDB++ analysis failed");
-                    e.printStackTrace();
                 }
                 break;
 

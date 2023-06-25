@@ -914,8 +914,19 @@ class TSN_Analyzer:
         # parse individual flows/methods into dictionaries
         result_by_methods = self._split_dnc_result(dnc_result_json_str)
         if len(result_by_methods) == 0:
-            print("Skip DNC analysis")
+            print("No result obtained from DNC, Skip")
             return
+
+        # Check if any unsuccessful execution
+        unsuccessful_exec_methods = set(methods) - set(result_by_methods.keys())
+        if len(unsuccessful_exec_methods) > 0:
+            print(
+                "Skip methods: {} because they are not available...".format(
+                    ",".join(unsuccessful_exec_methods)
+                ),
+                end="",
+                flush=True,
+            )
 
         # extract result obtained by each method
         for method, res_per_method in result_by_methods.items():
