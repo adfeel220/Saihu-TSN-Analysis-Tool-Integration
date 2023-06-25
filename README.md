@@ -251,6 +251,9 @@ pip install -e .
 
 ## Requirements
 - `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
+    
+    To use `lpsolve` with a Windows machine, please download the **executable build** instead of `LPSolve IDE`. For more details about the lpsolve executable build, please refer to the tutorial: [Steps to install and run lpsolve on a Windows machine using the command line (cmd)](https://sites.math.washington.edu/~conroy/m381-general/lpsolveHowToPC/runningLPsolveCommandLineWindows.htm). Please also specify the path inside [`resources/paths.json`](./src/saihu/resources/paths.json) for a different `lpsolve` build.
+
 - `CPLEX`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency. Once you install `CPLEX` on your device, please specify its folder containing CPLEX executable in `cplex` inside [`resources/paths.json`](./src/saihu/resources/paths.json).
 - `Java`: `JDK 16.0.2`
 - `Python`: Create an environment using `environment.yml` or installing `numpy`, `networkx`, `matplotlib`, `pulp`, and `mdutils` with `Python>=3.9`.
