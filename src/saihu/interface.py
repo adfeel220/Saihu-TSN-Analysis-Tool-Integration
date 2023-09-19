@@ -1221,19 +1221,25 @@ class TSN_Analyzer:
         flow_cmu_delays = dict()
 
         for flow in xtfa_net.flows:
-            cumulative_delays = list()
-            for nd in flow.graph.nodes:
-                cum_delay = flow.graph.nodes[nd]["flow_states"][0].maxDelayFrom[
-                    "source"
-                ]
-                if ignore_dummy and cum_delay <= 0:
-                    continue
-                ser_name = nd.rsplit("-", 1)[0] if is_converted else nd
-                cumulative_delays.append((ser_name, cum_delay))
+            for last_vertex in flow.getListLeafVertices():
+                if len(flow.getListLeafVertices()) > 1:
+                    destination = xtfa_net.getRemotePhyNode(last_vertex)
+                    flow_name = flow.name + "_" + destination
+                else:
+                    flow_name = flow.name
+                cumulative_delays = list()
+                for nd in nx.shortest_path(flow.graph,source=flow.sources[0],target=last_vertex):
+                    cum_delay = flow.graph.nodes[nd]["flow_states"][0].maxDelayFrom[
+                        "source"
+                    ]
+                    if ignore_dummy and cum_delay <= 0:
+                        continue
+                    ser_name = nd.rsplit("-", 1)[0] if is_converted else nd
+                    cumulative_delays.append((ser_name, cum_delay))
 
-            cumulative_delays.sort(key=lambda d: d[1])
-            flow_paths[flow.name] = [d[0] for d in cumulative_delays]
-            flow_cmu_delays[flow.name] = [d[1] for d in cumulative_delays]
+                cumulative_delays.sort(key=lambda d: d[1])
+                flow_paths[flow_name] = [d[0] for d in cumulative_delays]
+                flow_cmu_delays[flow_name] = [d[1] for d in cumulative_delays]
 
         return flow_paths, flow_cmu_delays
 
