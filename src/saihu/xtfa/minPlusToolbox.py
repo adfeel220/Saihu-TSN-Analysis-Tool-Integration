@@ -470,7 +470,7 @@ class LeakyBucket(Curve):
 
     def __mul__(self, o: Curve) -> Curve:
         if(isinstance(o,NoCurve)):
-            return NoCurve
+            return NoCurve()
         if(isinstance(o,LeakyBucket)):
             return GVBR([copy.deepcopy(self),copy.deepcopy(o)]).simplify()
         if(isinstance(o,GVBR)):
