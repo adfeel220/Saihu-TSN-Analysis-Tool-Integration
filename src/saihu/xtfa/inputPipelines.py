@@ -364,6 +364,8 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
     flagThatTriggersInstallation = "input-shaping"
     abbrvInTechnoThatTriggersInstallation = "IS"
     _shapingCurves: dict
+    is_packetizer_active: bool
+    _inputLinkSpeed: dict
 
     @classmethod
     def checkInstall(cls, compuFlags: Mapping, net: 'networks.Network', nodeName: str) -> bool:
@@ -401,6 +403,9 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
         """ In this implementation, the InputPortShapingInputPipelineStep is configured by filling the _shapingCurves attribute, which is done by looking at the flag 'transmission-capacity' of the previous nodes
         """
         step = cls(nodeName)
+        if("PK" in re.split("\+|\:|\/", compuFlags.get("technology",""))):
+            # Packetizer is active, register it
+            step.is_packetizer_active = True
         for prevNode in net.gif.predecessors(nodeName):
             linkSpeed = net.gif.nodes[prevNode]["computational_flags"].get("transmission-capacity", None)
             if(linkSpeed):
@@ -408,6 +413,7 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
                 # the shaping curve is a gamma_c curve, which is the same as a leakybucket with no burst
                 shapingCurve = mpt.LeakyBucket(linkSpeed,0)
                 step.setShapingCurveForIncommingEdge((prevNode,nodeName), shapingCurve)
+                step.setLinkSpeedForIncommingEdge((prevNode,nodeName), linkSpeed)
             else:
                 #setting none is the way to tell 'no shaping'
                 step.setShapingCurveForIncommingEdge((prevNode,nodeName), None)
@@ -418,6 +424,8 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
         """
         super().__init__(nodeName)
         self._shapingCurves = dict()
+        self._is_packetizer_active = False
+        self._inputLinkSpeed = dict()
 
     def setShapingCurveForIncommingEdge(self, edge, shapingCurve: mpt.Curve) -> None:
         """ Sets the shaping curve for the input port that corresponds to the provided edge in the ODG (Output port dependency graph)
@@ -427,6 +435,15 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
             shapingCurve (minPlusToolbox.Curve): The curve shaping the aggregate from this input port, or None if no shaping for this edge (<=> shaping with an infinite curve)
         """
         self._shapingCurves[edge] = shapingCurve
+
+    def setLinkSpeedForIncommingEdge(self, edge: Tuple[str,str], linkSpeed: float) -> None:
+        """ Sets the speed of the link connected to the input port represented by the provided edge. If provided, this information is used to compute a tighter packetization effect.
+
+        Args:
+            edge (Tuple[str,str]): An edge in the ODG (output port dependency graph)
+            linkSpeed (float): the speed of the link that is connected to the input port represented by the provided edge.
+        """
+        self._inputLinkSpeed[edge] = linkSpeed
     
     def overrideAllShapingCurvesForAlreadyConfiguredEdges(self, newShapingCurve: mpt.Curve) -> None:
         for k in self._shapingCurves.keys():
@@ -457,166 +474,14 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
         if(not newPartition.isPartition(flowStates)):
             raise AssertionError("not a valid partition")
         newPartition.name = "InputShaping"
+        if(self.is_packetizer_active):
+            # We add the packetization effect to this partition only
+            # Only the shaping curve will be affected, the burst of the individual flows will not be increased
+            # This is expected as packetization does not affect burst of curves that are obtained through a deconvolution with
+            # a delay bound, as the packetizer does not increase the worst-case delay.
+            newPartition.addPacketizationEffect(self._inputLinkSpeed)
+            newPartition.name = newPartition.name + "+" + "Packetization"
         partitions.append(newPartition)
-        self.checkAllPartitions(partitions, flowStates)
-
-
-class PacketizationInputPipelineStep(InputPipelineStep):
-    """This implementation of InputPipelineStep represents the effect of the packetizers located on the input ports of the network switch. Specifically, it:
-        - adds the packetization effect to all the flowstates (ie to the individual arrival curves)
-        - it breaks the already existing partitions (if any) depending on the input port of the flows (if required), and then it adds the packetization effect to any shapingcurve in any partition element in any of the already existing partitions.
-        - this step does not create a new partition, it modifies the existing ones.
-    """
-
-    _inputLinkSpeed: dict
-    abbrvInTechnoThatTriggersInstallation = "PK"
-
-    @classmethod
-    def checkInstall(cls, compuFlags: Mapping, net: 'networks.Network', nodeName: str) -> bool:
-        """ Returns True if the abbreviation 'PK' is in the 'technology' flag of the compuFlags dict AND if the node has at least one predecessor
-        """
-        if(cls.abbrvInTechnoThatTriggersInstallation in re.split("\+|\:|\/", compuFlags.get("technology",""))):
-            if (list(net.gif.predecessors(nodeName))):
-                # the node has predecessors, so incoming flows are expected, install
-                return True
-            return False
-        return super().checkInstall(compuFlags, net, nodeName)
-
-    @classmethod
-    def getConfiguredInstanceForNode(cls, compuFlags: Mapping, net: 'networks.Network', nodeName: str) -> InputPipelineStep:
-        """ Returns a configured instance. Configuration is performed by filling in the _inputLinkSpeed dictionnary attribute, by looking at the 'transmission-capacity' computationnal flag of the previous nodes
-        """
-        step = PacketizationInputPipelineStep(nodeName)
-        for prevNode in net.gif.predecessors(nodeName):
-            linkSpeed = net.gif.nodes[prevNode]["computational_flags"].get("transmission-capacity", None)
-            if(linkSpeed):
-                linkSpeed = unitUtility.readRate(linkSpeed)
-                step.setLinkSpeedForIncommingEdge((prevNode,nodeName), linkSpeed)
-        return step
-
-    def __init__(self, nodeName) -> None:
-        super().__init__(nodeName)
-        self._inputLinkSpeed = dict()
-
-    def getEdgeListInLinkSpeedDictionnary(self) -> List[Tuple[str,str]]:
-        return self._inputLinkSpeed.keys()
-
-    def setLinkSpeedForIncommingEdge(self, edge: Tuple[str,str], linkSpeed: float) -> None:
-        """ Sets the speed of the link connected to the input port represented by the provided edge. If provided, this information is used to compute a tighter packetization effect.
-
-        Args:
-            edge (Tuple[str,str]): An edge in the ODG (output port dependency graph)
-            linkSpeed (float): the speed of the link that is connected to the input port represented by the provided edge.
-        """
-        self._inputLinkSpeed[edge] = linkSpeed
-    
-    def executeStep(self, flowStates: List[FlowState], partitions: List[FlowsPartition]) -> None:
-        # packetization:
-        # - adds the packetization effect to the individual arrival curves
-        # - but does not add any penalty on the delay or RTO (packetization does not increase ETE delay bounds, except that it increases burstiness of flows)
-        for fs in flowStates:
-            if(fs.atEdge in self._inputLinkSpeed.keys()):
-                #link speed is known, can be used for improving packetization effect
-                fs.flags["internal-penalty"] = fs.arrivalCurve.get_packetization_penalty_curve(fs.flow.maxPacketLength, link_capacity=self._inputLinkSpeed[fs.atEdge])
-            else:
-                #link speed not known tradditionnal packetization effect
-                fs.flags["internal-penalty"] = fs.arrivalCurve.get_packetization_penalty_curve(fs.flow.maxPacketLength)
-        #Now we need to apply the packetization to all the previously known shaping curves that are part of a partition
-        #Each aggregate coming from a an input port is packetized differently, so we first need to make sure that:
-        # FOR ALL partition, EACH element of the partition ONLY CONTAINS flow states from the same edge
-        #so we will first break the partitions accordingly
-        for partition in partitions:
-            partition.breakPartitionByIncomingEdge()
-            if(not partition.isPartition(flowStates)):
-                raise AssertionError("not a valid partition")
-        # at this point we know that:
-        # for each partition,
-        #   for each element of this partition
-        #       the aggregate made of the flows in this element goes through the SAME packetizer,
-        #       so we can safely add the packetization effect to the shaping curve of every partition element
-        for partition in partitions:
-            partition.addPacketizationEffect(self._inputLinkSpeed)
-            partition.name = partition.name + "+" + "Packetization"
-        self.checkAllPartitions(partitions, flowStates)
-
-class CutThroughInputPipelineStep(InputPipelineStep):
-    """This implementation of InputPipelineStep represents the effect of the packetizers located on the input ports of the network switch. Specifically, it:
-        - adds the packetization effect to all the flowstates (ie to the individual arrival curves)
-        - it breaks the already existing partitions (if any) depending on the input port of the flows (if required), and then it adds the packetization effect to any shapingcurve in any partition element in any of the already existing partitions.
-        - this step does not create a new partition, it modifies the existing ones.
-    """
-
-    _inputLinkSpeed: dict
-    abbrvInTechnoThatTriggersInstallation = "CT"
-    overhead: float
-
-    @classmethod
-    def checkInstall(cls, compuFlags: Mapping, net: 'networks.Network', nodeName: str) -> bool:
-        """ Returns True if the abbreviation 'CT' is in the 'technology' flag of the compuFlags dict AND if the node has at least one predecessor
-        """
-        if(cls.abbrvInTechnoThatTriggersInstallation in re.split("\+|\:|\/", compuFlags.get("technology",""))):
-            if (list(net.gif.predecessors(nodeName))):
-                # the node has predecessors, so incoming flows are expected, install
-                return True
-            return False
-        return super().checkInstall(compuFlags, net, nodeName)
-
-    @classmethod
-    def getConfiguredInstanceForNode(cls, compuFlags: Mapping, net: 'networks.Network', nodeName: str) -> InputPipelineStep:
-        """ Returns a configured instance. Configuration is performed by filling in the _inputLinkSpeed dictionnary attribute, by looking at the 'transmission-capacity' computationnal flag of the previous nodes
-        """
-        step = cls(nodeName)
-        for prevNode in net.gif.predecessors(nodeName):
-            linkSpeed = net.gif.nodes[prevNode]["computational_flags"].get("transmission-capacity", None)
-            if(linkSpeed):
-                linkSpeed = unitUtility.readRate(linkSpeed)
-                step.setLinkSpeedForIncommingEdge((prevNode,nodeName), linkSpeed)
-        step.overhead = unitUtility.readDataUnit(net.gif.nodes[prevNode]["computational_flags"].get("header-size", "30B"))
-        return step
-
-    def __init__(self, nodeName) -> None:
-        super().__init__(nodeName)
-        self._inputLinkSpeed = dict()
-        self.overhead = 16*8
-    def getEdgeListInLinkSpeedDictionnary(self) -> List[Tuple[str,str]]:
-        return self._inputLinkSpeed.keys()
-
-    def setLinkSpeedForIncommingEdge(self, edge: Tuple[str,str], linkSpeed: float) -> None:
-        """ Sets the speed of the link connected to the input port represented by the provided edge. If provided, this information is used to compute a tighter packetization effect.
-
-        Args:
-            edge (Tuple[str,str]): An edge in the ODG (output port dependency graph)
-            linkSpeed (float): the speed of the link that is connected to the input port represented by the provided edge.
-        """
-        self._inputLinkSpeed[edge] = linkSpeed
-    
-    def executeStep(self, flowStates: List[FlowState], partitions: List[FlowsPartition]) -> None:
-        # packetization:
-        # - adds the packetization effect to the individual arrival curves
-        # - but does not add any penalty on the delay or RTO (packetization does not increase ETE delay bounds, except that it increases burstiness of flows)
-        for fs in flowStates:
-            if(fs.atEdge in self._inputLinkSpeed.keys()):
-                #link speed is known, can be used for improving packetization effect
-                fs.flags["internal-penalty"] = fs.arrivalCurve.get_packetization_penalty_curve(self.overhead, link_capacity=self._inputLinkSpeed[fs.atEdge])
-            else:
-                #link speed not known tradditionnal packetization effect
-                fs.flags["internal-penalty"] = fs.arrivalCurve.get_packetization_penalty_curve(self.overhead)
-        #Now we need to apply the packetization to all the previously known shaping curves that are part of a partition
-        #Each aggregate coming from a an input port is packetized differently, so we first need to make sure that:
-        # FOR ALL partition, EACH element of the partition ONLY CONTAINS flow states from the same edge
-        #so we will first break the partitions accordingly
-        for partition in partitions:
-            partition.breakPartitionByIncomingEdge()
-            if(not partition.isPartition(flowStates)):
-                raise AssertionError("not a valid partition")
-        # at this point we know that:
-        # for each partition,
-        #   for each element of this partition
-        #       the aggregate made of the flows in this element goes through the SAME packetizer,
-        #       so we can safely add the packetization effect to the shaping curve of every partition element
-        for partition in partitions:
-            partition.addFixedOverheadEffect(self._inputLinkSpeed, self.overhead)
-            partition.name = partition.name + "+" + "CutThrough"
         self.checkAllPartitions(partitions, flowStates)
              
 class InitialPerInputPortAggregatorInputPipelineStep(InputPipelineStep):
@@ -1475,7 +1340,7 @@ class InputPipeline:
     
     #List of available computational blocks.
     #The order of these modules mater for autoconfiguration because each of these class, in thi order, will be asked whether it should be instanciated based on the autoconfiguration flags (flags in compuFlag + content of the 'technology' string)
-    availableModules = [InitialPerInputPortAggregatorInputPipelineStep, InputPortShapingInputPipelineStep, PacketizationInputPipelineStep, CutThroughInputPipelineStep, PacketEliminationFunctionInputPipelineStep, PacketEliminationFunctionFlowStateForceMergingInputPipelineStep, PacketOrderingFunctionInputPipelineStep, RegulatorInputPipelineStep, LocalSourceApplicationsInputPipelineStep]
+    availableModules = [InitialPerInputPortAggregatorInputPipelineStep, InputPortShapingInputPipelineStep,PacketEliminationFunctionInputPipelineStep, PacketEliminationFunctionFlowStateForceMergingInputPipelineStep, PacketOrderingFunctionInputPipelineStep, RegulatorInputPipelineStep, LocalSourceApplicationsInputPipelineStep]
 
     pipeline: List[InputPipelineStep]
     flags: dict
@@ -1611,10 +1476,6 @@ class InputPipeline:
             for ips in self.pipeline:
                 t += ("- " + type(ips).__name__ + "\n")
             logger.debug(t)
-        #clear all internal penalties
-        for fss in self._flowStates:
-            fss.flags.pop("internal-penalty", None)
-        return curve
 
     def clearPipelineComputations(self) -> None:
         self.flags["pipeline_finished"] = False
