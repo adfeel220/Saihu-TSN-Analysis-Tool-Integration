@@ -364,7 +364,7 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
     flagThatTriggersInstallation = "input-shaping"
     abbrvInTechnoThatTriggersInstallation = "IS"
     _shapingCurves: dict
-    is_packetizer_active: bool
+    _is_packetizer_active: bool
     _inputLinkSpeed: dict
 
     @classmethod
@@ -405,7 +405,7 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
         step = cls(nodeName)
         if("PK" in re.split("\+|\:|\/", compuFlags.get("technology",""))):
             # Packetizer is active, register it
-            step.is_packetizer_active = True
+            step._is_packetizer_active = True
         for prevNode in net.gif.predecessors(nodeName):
             linkSpeed = net.gif.nodes[prevNode]["computational_flags"].get("transmission-capacity", None)
             if(linkSpeed):
@@ -474,7 +474,7 @@ class InputPortShapingInputPipelineStep(InputPipelineStep):
         if(not newPartition.isPartition(flowStates)):
             raise AssertionError("not a valid partition")
         newPartition.name = "InputShaping"
-        if(self.is_packetizer_active):
+        if(self._is_packetizer_active):
             # We add the packetization effect to this partition only
             # Only the shaping curve will be affected, the burst of the individual flows will not be increased
             # This is expected as packetization does not affect burst of curves that are obtained through a deconvolution with
@@ -1476,6 +1476,7 @@ class InputPipeline:
             for ips in self.pipeline:
                 t += ("- " + type(ips).__name__ + "\n")
             logger.debug(t)
+        return curve
 
     def clearPipelineComputations(self) -> None:
         self.flags["pipeline_finished"] = False
