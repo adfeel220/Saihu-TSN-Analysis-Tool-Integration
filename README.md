@@ -8,7 +8,7 @@ Institute: Computer Communications and Applications Laboratory 2 (LCA2), École 
 
 Table of Contents
 ========================
-- [Saihu: A Common Interface for Worst-Case Delay Analysis of Time-Sensitive Networks](#saihu-a-common-interface-for-worst-case-delay-analysis-of-time-sensitive-networks)
+- [Saihu: A Common Interface of Worst-Case Delay Analysis Tools for Time-Sensitive Networks](#saihu-a-common-interface-of-worst-case-delay-analysis-tools-for-time-sensitive-networks)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
   - [Cite this project](#cite-this-project)
@@ -16,7 +16,7 @@ Table of Contents
   - [Credit](#credit)
 - [Project Structure](#project-structure)
   - [File description](#file-description)
-  - [Credits to Files](#credits-to-files)
+  - [Credits to Packages](#credits-to-packages)
 - [Installation](#installation)
   - [Requirements](#requirements)
   - [Dependencies](#dependencies)
@@ -27,6 +27,9 @@ Table of Contents
     - [Output-Port Network](#output-port-network)
   - [Analysis Tools](#analysis-tools)
     - [Tool Specification](#tool-specification)
+    - [Command Line Exection](#command-line-exection)
+      - [Arguments](#arguments)
+      - [Examples](#examples)
     - [Public Methods](#public-methods)
     - [Init](#init)
     - [set\_shaping\_mode](#set_shaping_mode)
@@ -250,9 +253,13 @@ pip install -e .
 ```
 
 ## Requirements
-- `lpsolve`: Download and installed from [lpsolve](https://sourceforge.net/projects/lpsolve/). The `lp_solve` in the project is built on `macOS 12.6`, you may need to build a different version on your machine.
-    
-    To use `lpsolve` with a Windows machine, please download the **executable build** instead of `LPSolve IDE`. For more details about the lpsolve executable build, please refer to the tutorial: [Steps to install and run lpsolve on a Windows machine using the command line (cmd)](https://sites.math.washington.edu/~conroy/m381-general/lpsolveHowToPC/runningLPsolveCommandLineWindows.htm). Please also specify the path inside [`resources/paths.json`](./src/saihu/resources/paths.json) for a different `lpsolve` build.
+- `lpsolve`: Download and install from [lpsolve](https://sourceforge.net/projects/lpsolve/) based on your machine.
+    - **Windows machine**: To use `lpsolve` with a Windows machine, please download the **executable build** instead of `LPSolve IDE`. For more details about the lpsolve executable build, please refer to the tutorial: [Steps to install and run lpsolve on a Windows machine using the command line (cmd)](https://sites.math.washington.edu/~conroy/m381-general/lpsolveHowToPC/runningLPsolveCommandLineWindows.htm). Please also specify the path inside [`resources/paths.json`](./src/saihu/resources/paths.json) for a different `lpsolve` build.
+    - **Mac OSX**: You may see this tutorial: [Steps to install and run lpsolve on a Mac](https://sites.math.washington.edu/~conroy/m381-general/lpsolveHowToMac/lpsolveMacHow.html).
+    - **Ubuntu**: You can either download the compiled executable from the website or use
+      ```bash
+      sudo apt-get install lp-solve
+      ```
 
 - `CPLEX`: Licensed tool from IBM. Only used for `LUDB` of `DNC`, otherwise you can ignore this dependency. Once you install `CPLEX` on your device, please specify its folder containing CPLEX executable in `cplex` inside [`resources/paths.json`](./src/saihu/resources/paths.json).
 - `Java`: `JDK 16.0.2`
