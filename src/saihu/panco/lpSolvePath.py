@@ -21,13 +21,14 @@ import subprocess
 import shutil
 import warnings
 
-def _parse_lp_values(lp_solve_stdout:str):
+
+def _parse_lp_values(lp_solve_stdout: str):
     tab_values = lp_solve_stdout.split("\n")[4:-1]
     values = [
-            [token for token in line.split(" ") if not token == ""]
-            for line in tab_values
-        ]
+        [token for token in line.split(" ") if not token == ""] for line in tab_values
+    ]
     return dict(values)
+
 
 def _is_valid_path(solver_path: list):
     """Test if lp_solve executable is properly set"""
@@ -44,7 +45,7 @@ def _is_valid_path(solver_path: list):
     ).stdout
 
     values = _parse_lp_values(lp_solve_stdout)
-    return values.get('x', '') == '2' and values.get('y', '') == '3'
+    return values.get("x", "") == "2" and values.get("y", "") == "3"
 
 
 # Priority 1: the path written in saihu/resources/paths.json, by default getting empty
@@ -63,7 +64,7 @@ def _auto_resolve_system_lpsolve():
     for solver_alias_name in ["lp_solve", "lpsolve"]:
         path = shutil.which(solver_alias_name)
         if path is not None:
-            return path
+            return [path]
     return []
 
 
