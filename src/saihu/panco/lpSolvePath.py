@@ -79,8 +79,8 @@ def _resolve_path():
         return path
 
     # 3: program entry directory
-    if _is_valid_path(["./lp_solve"]):
-        return ["./lp_solve"]
+    if _is_valid_path([os.path.join(".", "lp_solve")]):
+        return [os.path.join(".", "lp_solve")]
 
     os_genre = system()
     if os_genre == "Windows":
