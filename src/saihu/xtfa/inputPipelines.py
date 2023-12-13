@@ -1476,6 +1476,7 @@ class InputPipeline:
             for ips in self.pipeline:
                 t += ("- " + type(ips).__name__ + "\n")
             logger.debug(t)
+        return curve
 
     def clearPipelineComputations(self) -> None:
         self.flags["pipeline_finished"] = False
