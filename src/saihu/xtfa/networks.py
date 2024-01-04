@@ -203,16 +203,20 @@ class WopanetReader:
                 return edge
         return (None,None)
 
+    def processAsymmetry(node, initial_link_dict):
+        pass
+
     def setComputationnalFlags(self, net: 'FeedForwardNetwork', root: xml.etree.ElementTree.Element):
         for node in net.gif.nodes.keys():
             dic_link_level = net.physicalTopo.edges[self.getPhyEdgeFromName(net, net.gif.nodes[node]["phylink_name"])]
+            updated_dic_link_level = self.processAsymmetry(node, dic_link_level)
             dic_node_level = net.physicalTopo.nodes[net.gif.nodes[node]["phynode_name"]]
             dic_network_level = root.findall("network")[0].attrib
 
             newDic = dict(net.netFlags)
             newDic = dict(newDic, **dic_network_level)
             newDic = dict(newDic, **dic_node_level)
-            newDic = dict(newDic, **dic_link_level)
+            newDic = dict(newDic, **updated_dic_link_level)
             net.gif.nodes[node]["computational_flags"] = dict( (key,newDic[key]) for key in (newDic.keys()))
             
     def configure_network_from_xml(self, net: 'FeedForwardNetwork', xmlFileName: str):
