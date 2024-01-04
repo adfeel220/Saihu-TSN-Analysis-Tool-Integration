@@ -300,18 +300,28 @@ On the other hand, since the delay are mostly caused by data flows competing the
 Here we remove most details and only focus on the output ports. The 3 flows provides data modelled by an arrival curve, and the 3 involved output ports process them with under the model of their service curves. This abstraction still captures the essential of the network, one can derive the same delay bound at each output port as the completed physical network.
 We refer this abstracted network as an **Output Port Network**.
 ### Physical Network
-In this section, we introduce the format to define a physical network.
+In this section, we introduce the format to define a physical network. 
+A physical network is an undirected graph where the nodes are the physical switches or end-systems ("stations") and the non-directed links are bidirectionnal transmission links.
 
-A physical network is defined in `WOPANet` format as a `.xml` file. It contains only one `elements` with the following attributes:
+A physical network is defined in `WoPANets` format as a `.xml` file. It contains only one `elements` with the following attributes:
 - `network`: Has the following attributes
     - `name`: Name of the network
-    - `technology`: Global specifications connected by _"+"_, where you can use
+    - `technology`: Defines the models that will be used to analyze the network, connected by _"+"_.You can use
         1. `FIFO`: FIFO property
-        2. `IS`: Input shaper
+        2. `IS`: Input shaping property
         3. `PK`: Packetizer
         4. `CEIL`: Fixed precision, can reduce computation time but slightly reduce precision.
-        5. `MOH` and `TDMI`: Can improve delay bounds. For technical details please contact the author of `xTFA` [Ludovic Thomas](mailto:ludovic.thomas@epfl.ch).
-    - Other attributes are optional, but used as a global parameter. If some parameters are not specified in each server/flow, the system uses the global parameter defined here instead.
+        5. `MOH` and `TDMI`: xTFA-specific options that can improve delay bounds. 
+        `MOH` stands for [Mohammadpour et al's delay improvement](https://doi.org/10.1109/LNET.2019.2927143). `TDMI` stands for "transmission delay is a minimum delay". 
+        This options instantiates a model that registers the transmission delay of a frame as a lower-bound of the minimum delay. Minimum delays are important mostly when using redundancy mechanisms. See [Thomas, Mifdaoui, Le Boudec](https://doi.org/10.1109/TNET.2022.3180763) for more information. 
+        For technical details on `xTFA` options please contact the author of `xTFA` [Ludovic Thomas](mailto:ludovic.thomas@cnrs.fr).
+    - Other attributes are optional, but used as a global parameter. 
+    
+    Note: `WoPANets XML` and `xTFA` use a inheritance scheme of the attributes. Each output port of the network inherits from the attributes of the `link` to which it is connected, from the attributes of the `station`/`switch` to which it belongs, and from the attributes of the `network`, with a priority scheme `link` > `switch`/`station` > `network`. This means that an attribute set for a `link` overwrites any attribute of the same name set for the associated `station`/`switch`, which overwites in turn any attribute of the same name set for the `network`.
+
+    For example, `transmission-capacity` can be set as an attribute of the `network` and will be inherited by all output ports of the network, except if you overwrite it with a `transmission-capacity` attribute at a given `link`.
+    Reciproqually, you can overwrite the technology of one specific `switch` by defining an attribute `technology` local to a `switch`. It will overwrite the `technology` attribute defined inside the `network` element for all the output ports connected to this switch and their models will be subsequently adapted. 
+    
 
     Example:
     ```xml
@@ -319,7 +329,7 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     ```
 - `station`/`switch`: The two names would not affect the analysis result, but for representing the physical network and readability. Can have the following attributes
     - `name`: Name of station/switch.
-    - `service-latency`: The latency of the rate-latency curve. Can assign different time units, `s`/`ms`/`us`, etc.
+    - `service-latency`: The latency of the rate-latency curve of the service-curve. Following the inheritance principle, this service curve will be set for all output ports connected to this `station`/`switch` except if overwritten by a `service-latency` attribute set on the `link`. Can assign different time units, `s`/`ms`/`us`, etc.
     - `service-rate`: The service rate of the rate-latency curve. Can assign different rate units, `Mbps`... (But not `bps` alone)
 
     Example:
@@ -327,20 +337,49 @@ A physical network is defined in `WOPANet` format as a `.xml` file. It contains 
     <station service-latency="1us" service-rate="100Gbps" name="src0"/>
 	<switch  service-latency="1us" service-rate="100Gbps" name="s0"/>
     ```
-- `link`: Connection link between ports, has the following attributes
+- `link`: **Bidirectional** link between two stations or switches, has the following attributes
     - `name`: Name of link.
-    - `from`: Which station/switch the link is connected from. Need to be name of station/switch.
-    - `to`: Which station/switch the link is connected to. Need to be name of station/switch.
-    - `fromPort`: The port number used for incoming station/switch.
-    - `toPort`: The port number used for outgoing station/switch.
+    - `from`: Name of the first station/switch connected to the link. Need to be name of station/switch.
+    - `to`: Name of the first station/switch connected to the link. Need to be name of station/switch.
+    - `fromPort`: A port number or any string to differentiates the port of the first (ie, `from`) station/switch connected to this link from any other port of the same station/switch connected to other links.
+    - `toPort`: A port number or any string to differentiates the port of the second (ie, `to`) station/switch connected to this link from any other port of the same station/switch connected to other links.
     - `transmission-capacity`: The transmission capacity of the link. Can assign different rate units, `Mbps`... (But not `bps` alone)
+
+    Note: The `to`/`from` distinction is only cosmetic. Both stations play the same role in the connection. In `Wopanet XML`, each `link` is **bidirectional**.
 
     Example:
     ```xml
-	<link from="src0" to="s0" fromPort="o0" toPort="i0" transmission-capacity="200Gbps" name="src_sw_0"/>
+	<link from="src0" to="s0" fromPort="0" toPort="0" transmission-capacity="200Gbps" name="src_sw_0"/>
     ```
-    Note: Service curve can also be defined on links as defined on station/switch. In this way, the service curve defined on the link that directly attached to the output port would be considered first.
-    Note 2: Transmission capacity can also be defined on station/switch, that would be the default capacity to all links attached to the station/switch if on capacity is defined on that link.
+
+    Note: You may also set the `service-rate`, `service-latency` or `transmission-capacity` attributes as attributes of the `link` element. Due to the inheritance principle, they will overwrite any identical attribute set for the `switch`/`station` or `network`.
+    But because of the bidirectional property of the link, the property will be applied to both output ports on both side of the link.
+
+    To set an attribute `<my-attribute>` only for the output port connected on the "`from`" `switch` [resp. on the "`to`" `switch`], you can use the attribute `<my-attribute>-of-from` [resp `<my-attribute>-of-to`].
+    `<my-attribute>-of-from` then overwrites the attribute `<my-attribute>` if present. 
+
+
+    Example A:
+    ```xml
+    <network name="NetA"/>
+    <station name="ES1" />
+    <station name="ES2" />
+    <link from="ES1" to="ES2" fromPort="0" toPort="0" service-rate-of-from="1Gbps" service-rate="100Mbps" />
+    ```
+
+    In `NetA`, the output port `ES1-0` has a service rate of 1Gbps (`service-rate-of-from` has priority) whereas the output port `ES2-0` has a service rate of 100Mbps (`service-rate-of-to` is absent, we fall back to the `service-rate` attribute).
+
+    Example B:
+    ```xml
+    <network name="NetB"/>
+    <station name="ES1" service-rate="200Mbps" />
+    <station name="ES2" service-rate="100Mbps" />
+    <link from="ES1" to="ES2" fromPort="0" toPort="0" service-rate-of-from="1Gbps" />
+    ```
+
+    In `NetB`, the output port `ES1-0` has a service rate of 1Gbps (`service-rate-of-from` has priority and overwrites the `service-rate` attribute defined on the `station` `ES1`) whereas the output port `ES2-0` has a service rate of 100Mbps (`service-rate-of-to` is absent, and `service-rate` is absent from the `link` level. By inheritance, we fall back to the `service-rate` attribute defined for `station` `ES2`).
+
+
 - `flow`: Flow of network, has attributes:
     - `name`: Name of flow
     - `arrival-curve`: Type of arrival curve, `leaky-bucket` for example. The curve can also be periodic but currently tools other than `xTFA` can not process it.
