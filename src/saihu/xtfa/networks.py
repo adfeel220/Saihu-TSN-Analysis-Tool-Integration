@@ -218,17 +218,24 @@ class WopanetReader:
         """
         updated_dict = dict(link_dict)
         this_one = None
+        the_other = None
         if updated_dict["to"] == physical_node:
             this_one = "to"
+            the_other = "from"
         if updated_dict["from"] == physical_node:
             this_one = "from"
+            the_other = "to"
         assert this_one != None
+        assert the_other != None
         
-        for key in updated_dict.keys():
+        list_of_keys = list(updated_dict.keys())
+        for key in list_of_keys:
             assert isinstance(key, str)
             if key.endswith("-of-%s" % this_one):
                 attribute = key.removesuffix("-of-%s" % this_one)
                 updated_dict[attribute] = updated_dict.pop(key)
+            if key.endswith("-of-%s" % the_other):
+                updated_dict.pop(key, None)
         return updated_dict
     
     def setComputationnalFlags(self, net: 'FeedForwardNetwork', root: xml.etree.ElementTree.Element):
@@ -499,7 +506,6 @@ class FeedForwardNetwork(NetworkInterface):
             n = nodes.Node(nodeName, self.name)
             self.gif.nodes[nodeName]["model"] = n
             n.autoInstallPipelines(self.gif.nodes[nodeName]["computational_flags"], self)
-        pass
 
     def isNodeReadyForComputation(self, nodeName):
         if not self.gif.in_edges(nodeName):
