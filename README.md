@@ -317,9 +317,9 @@ A physical network is defined in `WoPANets` format as a `.xml` file. It contains
         For technical details on `xTFA` options please contact the author of `xTFA` [Ludovic Thomas](mailto:ludovic.thomas@cnrs.fr).
     - Other attributes are optional, but used as a global parameter. 
     
-    Note: `WoPANets XML` and `xTFA` use a inheritance scheme of the attributes. Each output port of the network inherits from the attributes of the `link` to which it is connected, from the attributes of the `station`/`switch` to which it belongs, and from the attributes of the `network`, with a priority scheme `link` > `switch`/`station` > `network`. This means that an attribute set for a `link` overwrites any attribute of the same name set for the associated `station`/`switch`, which overwites in turn any attribute of the same name set for the `network`.
+    Note: `WoPANets XML` and `xTFA` use a inheritance scheme of the attributes. Each output port of the network inherits from the attributes of the `link` to which it is connected, from the attributes of the `station`/`switch` to which it belongs, and from the attributes of the `network`. Conflicts (attributes with the same name) are resolved with the following priority scheme: `link` > `switch`/`station` > `network`. This means that an attribute set for a `link` overwrites any attribute of the same name set for the associated `station`/`switch`, which overwites in turn any attribute of the same name set for the `network`.
 
-    For example, `transmission-capacity` can be set as an attribute of the `network` and will be inherited by all output ports of the network, except if you overwrite it with a `transmission-capacity` attribute at a given `link`.
+    For example, `transmission-capacity` can be set as an attribute of the `network` and will be inherited by all output ports of the network, except if you overwrite it with a `transmission-capacity` attribute at a given `link` or `switch`/`station`.
     Reciproqually, you can overwrite the technology of one specific `switch` by defining an attribute `technology` local to a `switch`. It will overwrite the `technology` attribute defined inside the `network` element for all the output ports connected to this switch and their models will be subsequently adapted. 
     
 
@@ -339,13 +339,13 @@ A physical network is defined in `WoPANets` format as a `.xml` file. It contains
     ```
 - `link`: **Bidirectional** link between two stations or switches, has the following attributes
     - `name`: Name of link.
-    - `from`: Name of the first station/switch connected to the link. Need to be name of station/switch.
-    - `to`: Name of the first station/switch connected to the link. Need to be name of station/switch.
-    - `fromPort`: A port number or any string to differentiates the port of the first (ie, `from`) station/switch connected to this link from any other port of the same station/switch connected to other links.
-    - `toPort`: A port number or any string to differentiates the port of the second (ie, `to`) station/switch connected to this link from any other port of the same station/switch connected to other links.
+    - `from`: Name of the first station/switch connected to the link. Needs to be the name of a station/switch.
+    - `to`: Name of the first station/switch connected to the link. Needs to be the name of a station/switch.
+    - `fromPort`: A port number or any string to differentiate the port of the first (ie, `from`) station/switch connected to this link from any other port of the same station/switch connected to other links.
+    - `toPort`: A port number or any string to differentiate the port of the second (ie, `to`) station/switch connected to this link from any other port of the same station/switch connected to other links.
     - `transmission-capacity`: The transmission capacity of the link. Can assign different rate units, `Mbps`... (But not `bps` alone)
 
-    Note: The `to`/`from` distinction is only cosmetic. Both stations play the same role in the connection. In `Wopanet XML`, each `link` is **bidirectional**.
+    Note: The `to`/`from` distinction is only cosmetic. Both ends of the link play the same role in the connection. In `Wopanet XML`, each `link` is **bidirectional**.
 
     Example:
     ```xml
@@ -355,7 +355,7 @@ A physical network is defined in `WoPANets` format as a `.xml` file. It contains
     Note: You may also set the `service-rate`, `service-latency` or `transmission-capacity` attributes as attributes of the `link` element. Due to the inheritance principle, they will overwrite any identical attribute set for the `switch`/`station` or `network`.
     But because of the bidirectional property of the link, the property will be applied to both output ports on both side of the link.
 
-    To set an attribute `<my-attribute>` only for the output port connected on the "`from`" `switch` [resp. on the "`to`" `switch`], you can use the attribute `<my-attribute>-of-from` [resp `<my-attribute>-of-to`].
+    To set an attribute `<my-attribute>` only for the output port of the "`from`" `switch` [resp. on the "`to`" `switch`], you can use the attribute `<my-attribute>-of-from` [resp `<my-attribute>-of-to`].
     `<my-attribute>-of-from` then overwrites the attribute `<my-attribute>` if present. 
 
 
@@ -367,7 +367,7 @@ A physical network is defined in `WoPANets` format as a `.xml` file. It contains
     <link from="ES1" to="ES2" fromPort="0" toPort="0" service-rate-of-from="1Gbps" service-rate="100Mbps" />
     ```
 
-    In `NetA`, the output port `ES1-0` has a service rate of 1Gbps (`service-rate-of-from` has priority) whereas the output port `ES2-0` has a service rate of 100Mbps (`service-rate-of-to` is absent, we fall back to the `service-rate` attribute).
+    In `NetA`, the output port `ES1-0` has a service rate of 1Gbps (`service-rate-of-from` has priority over the `service-rate` attribute), whereas the output port `ES2-0` has a service rate of 100Mbps (`service-rate-of-to` is absent, we fall back to the `service-rate` attribute).
 
     Example B:
     ```xml
