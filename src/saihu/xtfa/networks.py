@@ -204,15 +204,17 @@ class WopanetReader:
         return (None,None)
 
     def processAsymmetry(self, node, physical_node, link_dict: Mapping) -> Mapping:
-        """Modifies link_dict to process the optional attributes that are used to describe a difference service latency and service rate and link capacity fo the two ends of a same link.
-            If "service-rate" is not already present in link_dict's keys, updated_dict["service-rate"] gets the value of link_dict["service-rate-of-to"] or link_dict["service-rate-of-from"] (depending on the role of the physical node for the link).
-            If neither service-rate, nor service-rate-of-to, nor service-rate-of-from is present in link_dict's keys, then no "service-rate" key is added to updated_dict
+        """ Return a modified copy of link_dict, where any attribute <attribute>-of-<to/from>=<value>
+        is modified as <attribute>=<value>, by overwritting <attribute> if it was already present. 
+
         Args:
-            node (): The node (output-port)
-            physical_node (): The physical node (switch)
-            link_dict (Mapping): The dictionnary of link attributes
-        Return:
-            The updated dictionnary (modified copy of the input)
+            node (str): The output port 
+            physical_node (str): The physical node on which the output port is connected
+            link_dict (Mapping): List of computationnal flags that derives from the inheritance network/switch/link
+            
+
+        Returns:
+            Mapping: The modified mapping
         """
         updated_dict = dict(link_dict)
         this_one = None
@@ -221,26 +223,12 @@ class WopanetReader:
         if updated_dict["from"] == physical_node:
             this_one = "from"
         assert this_one != None
-        if "service-latency" not in updated_dict.keys():
-            latency = updated_dict.get("service-latency-of-%s" % this_one, None)
-            if latency != None:
-                updated_dict["service-latency"] = latency
-        if "service-rate" not in updated_dict.keys():
-            rate = updated_dict.get("service-rate-of-%s" % this_one, None)
-            if rate != None:
-                updated_dict["service-rate"] = rate
-        if "transmission-capacity" not in updated_dict.keys():
-            capacity = updated_dict.get("transmission-capacity-of-%s" % this_one, None)
-            if capacity != None:
-                updated_dict["transmission-capacity"] = capacity
-        #Cleaning options
-        updated_dict.pop("service-latency-of-from", None)
-        updated_dict.pop("service-latency-of-to", None)
-        updated_dict.pop("service-rate-of-from", None)
-        updated_dict.pop("service-rate-of-to", None)
-        updated_dict.pop("transmission-capacity-of-from", None)
-        updated_dict.pop("transmission-capacity-of-to", None)
-            
+        
+        for key in updated_dict.keys():
+            assert isinstance(key, str)
+            if key.endswith("-of-%s" % this_one):
+                attribute = key.removesuffix("-of-%s" % this_one)
+                updated_dict[attribute] = updated_dict.pop(key)
         return updated_dict
     
     def setComputationnalFlags(self, net: 'FeedForwardNetwork', root: xml.etree.ElementTree.Element):
