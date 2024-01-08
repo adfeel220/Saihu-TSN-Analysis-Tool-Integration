@@ -203,10 +203,46 @@ class WopanetReader:
                 return edge
         return (None,None)
 
+    def processAsymmetry(self, node, physical_node, link_dict: Mapping) -> Mapping:
+        """ Return a modified copy of link_dict, where any attribute <attribute>-of-<to/from>=<value>
+        is modified as <attribute>=<value>, by overwritting <attribute> if it was already present. 
+
+        Args:
+            node (str): The output port 
+            physical_node (str): The physical node on which the output port is connected
+            link_dict (Mapping): List of computationnal flags that derives from the inheritance network/switch/link
+            
+
+        Returns:
+            Mapping: The modified mapping
+        """
+        updated_dict = dict(link_dict)
+        this_one = None
+        the_other = None
+        if updated_dict["to"] == physical_node:
+            this_one = "to"
+            the_other = "from"
+        if updated_dict["from"] == physical_node:
+            this_one = "from"
+            the_other = "to"
+        assert this_one != None
+        assert the_other != None
+        
+        list_of_keys = list(updated_dict.keys())
+        for key in list_of_keys:
+            assert isinstance(key, str)
+            if key.endswith("-of-%s" % this_one):
+                attribute = key.removesuffix("-of-%s" % this_one)
+                updated_dict[attribute] = updated_dict.pop(key)
+            if key.endswith("-of-%s" % the_other):
+                updated_dict.pop(key, None)
+        return updated_dict
+    
     def setComputationnalFlags(self, net: 'FeedForwardNetwork', root: xml.etree.ElementTree.Element):
         for node in net.gif.nodes.keys():
-            dic_link_level = net.physicalTopo.edges[self.getPhyEdgeFromName(net, net.gif.nodes[node]["phylink_name"])]
-            dic_node_level = net.physicalTopo.nodes[net.gif.nodes[node]["phynode_name"]]
+            physical_node_name = net.gif.nodes[node]["phynode_name"]
+            dic_link_level = self.processAsymmetry(node, physical_node_name, net.physicalTopo.edges[self.getPhyEdgeFromName(net, net.gif.nodes[node]["phylink_name"])])
+            dic_node_level = net.physicalTopo.nodes[physical_node_name]
             dic_network_level = root.findall("network")[0].attrib
 
             newDic = dict(net.netFlags)
