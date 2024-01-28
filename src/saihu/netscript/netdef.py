@@ -514,9 +514,12 @@ class OutputPortNet:
             # Capacity #
             ############
             # Default capacity is the maximum service rate
-            default_capacity = network_def["network"].get("capacity", max(service_curve["rates"]))
+            default_capacity = network_def["network"].get("capacity", None)
             capacity = ser.get("capacity", default_capacity)
-            capacity = try_raise(f"Parsing servers.capacity of \"{ser_name}\"", capacity, self._convert_unit, capacity, unit["rate"], "rate")
+            if capacity is None:
+                capacity = max(service_curve["rates"])
+            else:
+                capacity = try_raise(f"Parsing servers.capacity of \"{ser_name}\"", capacity, self._convert_unit, capacity, unit["rate"], "rate")
 
             # check server capacity validity
             if capacity <= 0:
