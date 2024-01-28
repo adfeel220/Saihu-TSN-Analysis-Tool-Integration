@@ -526,6 +526,11 @@ class TSN_Analyzer:
             flow_paths, flow_cmu_delays = self._xtfa_delay_per_flow(
                 xtfa_net, len(from_converted_file) > 0
             )
+            # skip if obtains nothing
+            if all(len(delay) == 0 for delay in flow_cmu_delays.values()):
+                print("Skip because no result obtained from xTFA, maybe it is because of ARBITRARY multiplexing")
+                return
+
             # determine delay multiplier
             min_mul = unit_util.decide_min_multiplier(server_delays.values())
             if self.serv_delay_mul is None:
@@ -538,7 +543,10 @@ class TSN_Analyzer:
 
             flow_delays = dict()
             for fl_name, cmu_delays in flow_cmu_delays.items():
+                if len(cmu_delays) == 0:
+                    continue
                 flow_delays[fl_name] = cmu_delays[-1]
+
             # determine delay multiplier
             min_mul = unit_util.decide_min_multiplier(flow_delays.values())
             if self.flow_delay_mul is None:
@@ -751,7 +759,7 @@ class TSN_Analyzer:
 
             panco_anzr = panco_analyzer(netfile)
             output_shaping = (
-                self.shaping == FORCE_SHAPER.AUTO or self.shaping == FORCE_SHAPER.ON
+                self.shaping == FORCE_SHAPER.AUTO and panco_anzr.shaper_defined or self.shaping == FORCE_SHAPER.ON
             )
             panco_anzr.build_network(output_shaping)
 
