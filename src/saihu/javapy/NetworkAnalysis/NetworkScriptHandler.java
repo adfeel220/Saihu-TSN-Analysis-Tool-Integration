@@ -153,15 +153,13 @@ public class NetworkScriptHandler {
             double lat = latencies.getDouble(0);
             double rate = rates.getDouble(0);
             ServiceCurve sCurve = Curve.getFactory().createRateLatency(rate, lat);
-            // Combine multiple segments, temporarily disabled because it causes trouble while calculating with
-            // PMOO, TMA and LUDB
-//            for (int j=1; j<curveSegmentsNum; j++){
-//                lat = latencies.getDouble(j);
-//                rate = rates.getDouble(j);
-//                ServiceCurve newSegment = Curve.getFactory().createRateLatency(rate, lat);
-//                // Update the curve
-//                sCurve = Curve.getUtils().max(sCurve, newSegment);
-//            }
+            for (int j=1; j<curveSegmentsNum; j++){
+                lat = latencies.getDouble(j);
+                rate = rates.getDouble(j);
+                ServiceCurve newSegment = Curve.getFactory().createRateLatency(rate, lat);
+                // Update the curve
+                sCurve = Curve.getUtils().max(sCurve, newSegment);
+            }
 
             // Construct max service curve
             double maxPacketLength = getMaxPacketLength(i);
@@ -169,7 +167,8 @@ public class NetworkScriptHandler {
             Curve maxCurve = Curve.getFactory().createTokenBucket(capacity, maxPacketLength);
             MaxServiceCurve msCurve = Curve.getFactory().createMaxServiceCurve(maxCurve);
 
-            String multiplexing = serverInfo.optString("multiplexing", "FIFO");
+            String defaultMultiplexing = networkInfo.optString("multiplexing", "ARBITRARY");
+            String multiplexing = serverInfo.optString("multiplexing", defaultMultiplexing);
             AnalysisConfig.Multiplexing localMultiplexing;
             if (multiplexing.equalsIgnoreCase("FIFO")) {
                 localMultiplexing = AnalysisConfig.Multiplexing.FIFO;
