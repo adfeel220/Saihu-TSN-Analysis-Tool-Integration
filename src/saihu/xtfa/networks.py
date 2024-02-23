@@ -578,7 +578,7 @@ class FeedForwardNetwork(NetworkInterface):
         return (delayList, deadlineList)
 
     def getRemotePhyNode(self, outputPort) -> Optional[str]:
-        localNode, localPort = outputPort.split("-")
+        localNode, localPort = outputPort.rsplit("-", 1)
         for edge in self.physicalTopo.edges(localNode):
             if (self.physicalTopo.edges[edge]["from"] == localNode) and (self.physicalTopo.edges[edge]["fromPort"] == localPort):
                     return self.physicalTopo.edges[edge]["to"]
