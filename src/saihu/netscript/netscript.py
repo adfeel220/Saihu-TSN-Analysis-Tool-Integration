@@ -274,8 +274,24 @@ class NetworkScriptHandler:
                 if port_idx is not None:
                     path.append(servers[port_idx]["name"])
 
+            # Multicast
+            if "multicast" in fl_data:
+                multicast = list()
+                for mpath in fl_data["multicast"]:
+                    multicast.append(dict())
+                    multicast[-1]["name"] = mpath["name"]
+
+                    multicast_path = list()
+                    for step in mpath["path"]:
+                        port_idx = self._get_portlist_index(port_list, step["node"], step["port"])
+                        if port_idx is not None:
+                            multicast_path.append(servers[port_idx]["name"])
+                    multicast[-1]["path"] = multicast_path
+
+                attrib["multicast"] = multicast
+
             # Assign the loaded information into the flow info
-            flow_info = {"name": fl_name,"path": path, "arrival_curve": arrival_curve, **attrib}
+            flow_info = {"name": fl_name, "path": path, "arrival_curve": arrival_curve, **attrib}
 
             # Get flow packet length max/min
             # max
@@ -440,6 +456,19 @@ class NetworkScriptHandler:
                 "name": f"lk:{server_names[last_node]}_{port_names[last_node]}-{sinks[fid]}_0"
             }
             ET.SubElement(root, "link", link_info)
+
+            if "multicast" in flow:
+                for mpath in flow["multicast"]:
+                    last_node = mpath["path"][-1]
+                    link_info = {
+                        "from": server_names[last_node],
+                        "to": sinks[fid],
+                        "fromPort": port_names[last_node],
+                        "toPort": "i0",
+                        "name": f"lk:{server_names[last_node]}_{port_names[last_node]}-{sinks[fid]}_0"
+                    }
+                    ET.SubElement(root, "link", link_info)
+
     
         # Connect all links defined on adjacency matrix
         for r, row in enumerate(self.op_net.adjacency_mat):
@@ -496,11 +525,19 @@ class NetworkScriptHandler:
 
             serialize_number(flow)
             flow_elem = ET.SubElement(root, "flow", flow_info, **flow)
-            path_elem = ET.SubElement(flow_elem, "target")
+            path_elem = ET.SubElement(flow_elem, "target", name=flow["path_name"])
 
             for step in path:
                 ET.SubElement(path_elem, "path", node=server_names[step])
             ET.SubElement(path_elem, "path", node=sinks[fid])
+
+            # multicast
+            if "multicast" in flow:
+                for mpath in flow["multicast"]:
+                    path_elem = ET.SubElement(flow_elem, "target", name=mpath["name"])
+                    for step in mpath["path"]:
+                        ET.SubElement(path_elem, "path", node=server_names[step])
+                    ET.SubElement(path_elem, "path", node=sinks[fid])
 
         #################
         # Dump XML file #

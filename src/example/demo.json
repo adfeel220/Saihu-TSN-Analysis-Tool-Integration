@@ -16,6 +16,13 @@
         {
             "name": "f0",
             "path": ["s0-o0", "s1-o0"],
+            "path_name": "p0",
+            "multicast": [
+                {
+                    "name": "p1",
+                    "path": ["s0-o0", "s1-o1"]
+                }
+            ],
             "arrival_curve": {
                 "bursts": [10, "2kB"],
                 "rates": ["10kbps", 0.5]
@@ -49,8 +56,8 @@
         {
             "name": "s0-o0",
             "service_curve": {
-                "latencies": [10, 1000],
-                "rates": [4, "50Mbps"]
+                "latencies": [10, "1ms"],
+                "rates": ["4Mbps", "50Mbps"]
             },
             "capacity": 100
         },

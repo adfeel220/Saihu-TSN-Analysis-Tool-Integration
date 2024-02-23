@@ -200,31 +200,48 @@ class PhysicalNet:
                 raise xml.etree.ElementTree.ParseError(f"Flow \"{fl_name}\" needs to have a source") from e
 
             fl_attrib = copy.deepcopy(fl.attrib)
+            fl_key = fl_name
+            self.flows[fl_key] = dict()
+            self.flows[fl_key]["attrib"] = dict(**fl_attrib)
 
             paths = fl.findall(keysInWopanetXML["flow_path"])
             for path_idx, fl_path in enumerate(paths):
                 path_name = fl_path.attrib.pop("name", f"p{path_idx}")
-                path_attrib = copy.deepcopy(fl_path.attrib)
-                
-                # fl_name = f"{fl_name}_{path_name}"
-                fl_key = fl_name
-                if len(paths)>1:
-                    fl_key = f"{fl_name}_{path_name}"
 
-                self.flows[fl_key] = dict()
-                self.flows[fl_key]["path"] = list()
-                self.flows[fl_key]["attrib"] = dict(**fl_attrib, **path_attrib)
-                prev_node = source
-                for step in fl_path.findall(keysInWopanetXML["flow_path_step"]):
-                    try:
-                        dest = step.attrib.pop(keysInWopanetXML["flow_path_step_name"])
-                    except KeyError as e:
-                        raise AttributeError("No attribute \"%s\" in flow %s, path %s".format(keysInWopanetXML["flow_path_step_name"], fl_key, path_name)) from e
+                # is multicast
+                if path_idx > 0:
+                    if "multicast" not in self.flows[fl_key]:
+                        self.flows[fl_key]["multicast"] = list()
+                    self.flows[fl_key]["multicast"].append(dict())
+                    self.flows[fl_key]["multicast"][-1]["name"] = path_name
+                    self.flows[fl_key]["multicast"][-1]["path"] = list()
+                    prev_node = source
+                    for step in fl_path.findall(keysInWopanetXML["flow_path_step"]):
+                        try:
+                            dest = step.attrib.pop(keysInWopanetXML["flow_path_step_name"])
+                        except KeyError as e:
+                            raise AttributeError("No attribute \"%s\" in flow %s, path %s".format(keysInWopanetXML["flow_path_step_name"], fl_key, path_name)) from e
 
-                    path_step = {"node": prev_node, "port": self.__get_link_port(prev_node, dest)}
-                    self.flows[fl_key]["path"].append(path_step)
-                    
-                    prev_node = dest
+                        path_step = {"node": prev_node, "port": self.__get_link_port(prev_node, dest)}
+                        self.flows[fl_key]["multicast"][-1]["path"].append(path_step)
+
+                        prev_node = dest
+                    continue
+
+                else:
+                    self.flows[fl_key]["attrib"]["path_name"] = path_name
+                    self.flows[fl_key]["path"] = list()
+                    prev_node = source
+                    for step in fl_path.findall(keysInWopanetXML["flow_path_step"]):
+                        try:
+                            dest = step.attrib.pop(keysInWopanetXML["flow_path_step_name"])
+                        except KeyError as e:
+                            raise AttributeError("No attribute \"%s\" in flow %s, path %s".format(keysInWopanetXML["flow_path_step_name"], fl_key, path_name)) from e
+
+                        path_step = {"node": prev_node, "port": self.__get_link_port(prev_node, dest)}
+                        self.flows[fl_key]["path"].append(path_step)
+
+                        prev_node = dest
 
 
     def get_output_ports(self, ignore_dummy:bool=False)->list:
@@ -409,28 +426,20 @@ class OutputPortNet:
 
             # path defined as a list of server names
             path_in_name = fl["path"]
+            if "path_name" not in fl:
+                fl["path_name"] = "p0"
 
-            # path defined as a list of server indices, server index is the order defined in server list
-            path_in_idx = [None]*len(path_in_name)
-            for sid, sname in enumerate(path_in_name):
-                if sname not in server_name_index_table:
-                    raise RuntimeError(f"Server name \"{sname}\" written in flow \"{flow_name}\" is not defined")
-                path_in_idx[sid] = server_name_index_table[sname]
-
+            path_in_idx, is_dummy = self._register_path(path_in_name, server_name_index_table, flow_name)
             fl["path"] = path_in_idx
-
-            ## Check if it's a valid path
-            # 1. no recurring server along the path
-            if len(path_in_idx) != len(set(path_in_idx)):
-                raise RuntimeError(f"Skip flow {flow_name} due to recurring server in its path: {path_in_name}")
-            # 2. non-empty path
-            if len(path_in_idx) <= 0:
-                warnings.warn(f"Skip flow {flow_name} because its path is empty, you may delete this flow")
+            if is_dummy:
                 continue
 
-            # Construct adjacency matrix
-            for sid in range(len(path_in_idx)-1):
-                self.adjacency_mat[path_in_idx[sid], path_in_idx[sid+1]] = 1
+            # Register multicast paths
+            multicast_paths = fl.get("multicast", [])
+            for mpath_idx, mpath in enumerate(multicast_paths):
+                path_name = mpath.get("name", f"p{mpath_idx+1}")
+                path_in_idx, is_dummy = self._register_path(mpath["path"], server_name_index_table, flow_name)
+                fl["multicast"][mpath_idx] = {"name": path_name, "path": path_in_idx}
 
             ## Check arrival curve syntax
             default_arrival_curve = network_def["network"].get("arrival_curve", None)
@@ -534,15 +543,77 @@ class OutputPortNet:
         '''
         Dump the file into a json
         '''
+        # manage multicast flows
+        flows = list()
+        for fl in self.flows:
+            fl = deepcopy(fl)
+            if "multicast" not in fl:
+                flows.append(fl)
+                continue
+
+            flow_name = fl["name"]
+            multicast = fl.pop("multicast")
+
+            # main path
+            path_name = fl.pop("path_name")
+            fl["name"] = f"{flow_name}#{path_name}"
+            flows.append(deepcopy(fl))
+
+            # multicast paths
+            for mpath in multicast:
+                path_name = mpath["name"]
+                fl["name"] = f"{flow_name}#{path_name}"
+                fl["path"] = mpath["path"]
+                flows.append(deepcopy(fl))
+
+        # dump results
         out_dict = {
             "network": self.network_info,
             "adjacency_matrix": self.adjacency_mat.tolist(),
-            "flows": self.flows,
+            "flows": flows,
             "servers": self.servers
         }
         with open(ofile, 'w') as f:
             json.dump(out_dict, f, indent=4)
 
+    def _register_path(self, path_in_name:list, server_name_index_table:dict, flow_name:str) -> tuple:
+        '''
+        Register a path from a sequence of server names indices and check validity
+
+        Inputs
+        ------
+        path_in_name: list of server names, as list of strings
+        server_name_index_table: dictionary given name of server returns server index
+        flow_name: name of flow for error message printing
+
+        Returns
+        -------
+        path_in_index: `list[Int]`, path as a list of server indices
+        flow_is_dummy: `Bool`, whether the flow is a dummy flow and can be ignored
+        '''
+        flow_is_dummy = False
+
+        # path defined as a list of server indices, server index is the order defined in server list
+        path_in_idx = [None]*len(path_in_name)
+        for sid, sname in enumerate(path_in_name):
+            if sname not in server_name_index_table:
+                raise RuntimeError(f"Server name \"{sname}\" written in flow \"{flow_name}\" is not defined")
+            path_in_idx[sid] = server_name_index_table[sname]
+
+        ## Check if it's a valid path
+        # 1. no recurring server along the path
+        if len(path_in_idx) != len(set(path_in_idx)):
+            raise RuntimeError(f"Skip flow {flow_name} due to recurring server in its path: {path_in_name}")
+        # 2. non-empty path
+        if len(path_in_idx) <= 0:
+            warnings.warn(f"Skip flow {flow_name} because its path is empty, you may delete this flow")
+            flow_is_dummy = True
+
+        # Construct adjacency matrix
+        for sid in range(len(path_in_idx)-1):
+            self.adjacency_mat[path_in_idx[sid], path_in_idx[sid+1]] = 1
+
+        return path_in_idx, flow_is_dummy
 
     def _assert_mandatory_fields(self, data:dict, subfields:list=[]) -> None:
         '''

@@ -596,7 +596,7 @@ class TSN_Analyzer:
                 exec_time=exec_time,
                 units={"time": "s", "data": "b", "rate": "bps"},
                 network_source=netfile,
-                from_converted_file=from_converted_file,
+                converted_from=from_converted_file,
             )
             self.results.append(result)
 
@@ -710,7 +710,7 @@ class TSN_Analyzer:
                 exec_time=exec_time,
                 units=linear_solver.units,
                 network_source=netfile,
-                from_converted_file=self.script_handler.get_network_info(
+                converted_from=self.script_handler.get_network_info(
                     netfile, "converted", ""
                 ),
             )
@@ -844,7 +844,7 @@ class TSN_Analyzer:
                 exec_time=exec_time,
                 units=panco_anzr.units,
                 network_source=netfile,
-                from_converted_file=self.script_handler.get_network_info(
+                converted_from=self.script_handler.get_network_info(
                     netfile, "converted", ""
                 ),
             )
@@ -924,6 +924,25 @@ class TSN_Analyzer:
         if len(result_by_methods) == 0:
             print("No result obtained from DNC, Skip")
             return
+        
+        # for multicast flows, select only the maximum delay
+        for method, results in result_by_methods.items():
+            valid_results = list()
+            index = 0
+            for fl in self.script_handler.op_net.flows:
+                if "multicast" not in fl:
+                    valid_results.append(results[index])
+                    index += 1
+                    continue
+                num_paths = 1 + len(fl["multicast"])
+                argmax = max(range(index, index + num_paths), key=lambda x : results[x]["flow_delays"])  # hacky argmax
+                res = deepcopy(results[argmax])
+                res["flow_name"] = fl["name"]
+                valid_results.append(res)
+
+                index += num_paths
+            
+            result_by_methods[method] = valid_results
 
         # Check if any unsuccessful execution
         unsuccessful_exec_methods = set(methods) - set(result_by_methods.keys())
@@ -1036,7 +1055,7 @@ class TSN_Analyzer:
             result["graph"] = nx.relabel_nodes(result["graph"], graph_name_mapping)
 
             result["network_source"] = netfile
-            result["from_converted_file"] = self.script_handler.get_network_info(
+            result["converted_from"] = self.script_handler.get_network_info(
                 netfile, "converted", ""
             )
 
@@ -1229,12 +1248,9 @@ class TSN_Analyzer:
         flow_cmu_delays = dict()
 
         for flow in xtfa_net.flows:
+            flow_name = flow.name
+            worst_delay = 0.0
             for last_vertex in flow.getListLeafVertices():
-                if len(flow.getListLeafVertices()) > 1:
-                    destination = xtfa_net.getRemotePhyNode(last_vertex)
-                    flow_name = flow.name + "_" + destination
-                else:
-                    flow_name = flow.name
                 cumulative_delays = list()
                 for nd in nx.shortest_path(flow.graph,source=flow.sources[0],target=last_vertex):
                     cum_delay = flow.graph.nodes[nd]["flow_states"][0].maxDelayFrom[
@@ -1246,8 +1262,10 @@ class TSN_Analyzer:
                     cumulative_delays.append((ser_name, cum_delay))
 
                 cumulative_delays.sort(key=lambda d: d[1])
-                flow_paths[flow_name] = [d[0] for d in cumulative_delays]
-                flow_cmu_delays[flow_name] = [d[1] for d in cumulative_delays]
+                if cumulative_delays[-1][1] > worst_delay:
+                    flow_paths[flow_name] = [d[0] for d in cumulative_delays]
+                    flow_cmu_delays[flow_name] = [d[1] for d in cumulative_delays]
+                    worst_delay = cumulative_delays[-1][1]
 
         return flow_paths, flow_cmu_delays
 
@@ -1479,10 +1497,14 @@ class TSN_Analyzer:
         """
         ## Calculate utility
         for i, res in enumerate(tm_results.values()):
-            if res.is_converted() and i < (len(tm_results) - 1):
-                continue
+            if res.is_converted():
+                if i < (len(tm_results) - 1):
+                    continue
+                source_file = res.converted_from
+            else:
+                source_file = res.network_source
 
-            utility = self.script_handler.get_network_utility(res.network_source)
+            utility = self.script_handler.get_network_utility(source_file)
             max_utility = ""
             if len(utility) > 0:
                 max_utility = max(utility.values())

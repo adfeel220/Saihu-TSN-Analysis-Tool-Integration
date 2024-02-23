@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <elements>
-    <network name="demo" technology="FIFO+IS" minimum-packet-size="4B"/>
+    <network name="demo" technology="FIFO+IS+PK" minimum-packet-size="4B"/>
 
     <!-- Stations/switchs -->
     <station name="src0"/>
@@ -24,10 +24,15 @@
 
     <!-- Flows -->
     <flow name="f0" arrival-curve="leaky-bucket" lb-burst="10B" lb-rate="10kbps" maximum-packet-size="50B" source="src0">
-        <target>
+        <target name="p0">
             <path node="s0"/>
             <path node="s1"/>
             <path node="sink0"/>
+        </target>
+        <target name="p1">
+            <path node="s0"/>
+            <path node="s1"/>
+            <path node="sink1"/>
         </target>
     </flow>
     <flow name="f1" arrival-curve="leaky-bucket" lb-burst="10B" lb-rate="10kbps" maximum-packet-size="50B" source="src1">
