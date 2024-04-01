@@ -24,6 +24,13 @@ def warning_override(
 
 warnings.showwarning = warning_override
 
+def flow_is_multicast(flow:dict) -> bool:
+    '''
+    Return whether a flow is a multicast flow
+    '''
+    if "multicast" in flow:
+        return len(flow["multicast"]) > 0
+    return False
 
 class panco_analyzer:
     """
@@ -195,6 +202,14 @@ class panco_analyzer:
             # append flow
             self.flows.append(Flow(arrival_curves, path))
 
+            # multicast flow
+            if flow_is_multicast(fl):
+                for mpath in fl["multicast"]:
+                    path_name = mpath["name"]
+                    path = mpath["path"]
+                    self.flow_names.append(fl.get("name", f"fl_{fl_id}"))
+                    self.flows.append(Flow(arrival_curves, path))
+
         ## Create a network for analysis
         self.network = Network(self.servers, self.flows)
 
@@ -249,8 +264,24 @@ class panco_analyzer:
             filename=lp_file,
         )
         delay_per_flow = plp.all_delays
+        flow_names = list()
+        flow_delays = list()
+        index = 0
+        for fl in self.flows_info:
+            if not flow_is_multicast(fl):
+                num_paths = 1
+                flow_names.append(self.flow_names[index])
+                flow_delays.append(delay_per_flow[index])
+            else:
+                num_paths = 1 + len(fl["multicast"])
+                argmax = max(range(index, index + num_paths), key=lambda x : delay_per_flow[x])  # hacky argmax
+                flow_names.append(self.flow_names[argmax])
+                flow_delays.append(delay_per_flow[argmax])
+            index += num_paths
 
-        return delay_per_flow, None
+        self.flow_names = flow_names
+
+        return flow_delays, None
 
     def analyze_tfa(self, lp_file: str = "fifo.lp") -> tuple:
         """
@@ -263,10 +294,27 @@ class panco_analyzer:
         delay_per_flow = tfa.all_delays
         delay_per_server = tfa.delay_servers
 
+        flow_names = list()
+        flow_delays = list()
+        index = 0
+        for fl in self.flows_info:
+            if not flow_is_multicast(fl):
+                num_paths = 1
+                flow_names.append(self.flow_names[index])
+                flow_delays.append(delay_per_flow[index])
+            else:
+                num_paths = 1 + len(fl["multicast"])
+                argmax = max(range(index, index + num_paths), key=lambda x : delay_per_flow[x])  # hacky argmax
+                flow_names.append(self.flow_names[argmax])
+                flow_delays.append(delay_per_flow[argmax])
+            index += num_paths
+
+        self.flow_names = flow_names
+
         for sid in self.server_no_flow:
             delay_per_server[sid] = 0.0
 
-        return delay_per_flow, delay_per_server
+        return flow_delays, delay_per_server
 
     def analyze_sfa(self, lp_file: str = "fifo.lp") -> tuple:
         """
@@ -278,7 +326,24 @@ class panco_analyzer:
         sfa = SfaLP(self.network, filename=lp_file)
         delay_per_flow = sfa.all_delays
 
-        return delay_per_flow, None
+        flow_names = list()
+        flow_delays = list()
+        index = 0
+        for fl in self.flows_info:
+            if not flow_is_multicast(fl):
+                num_paths = 1
+                flow_names.append(self.flow_names[index])
+                flow_delays.append(delay_per_flow[index])
+            else:
+                num_paths = 1 + len(fl["multicast"])
+                argmax = max(range(index, index + num_paths), key=lambda x : delay_per_flow[x])  # hacky argmax
+                flow_names.append(self.flow_names[argmax])
+                flow_delays.append(delay_per_flow[argmax])
+            index += num_paths
+
+        self.flow_names = flow_names
+
+        return flow_delays, None
 
     def __get_flows(self, server: int) -> list:
         """

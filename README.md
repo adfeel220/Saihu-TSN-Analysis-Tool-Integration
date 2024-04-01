@@ -386,12 +386,13 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     - `name`: Name of network
     - `packetizer`: Whether to apply packetizer
     - `multiplexing`: Multiplexing policy, either `FIFO` or `ARBITRARY`
-    - `analysis_option`: Additional options, takes the same arguments as `technology` in physical network format.
+    - `analysis_option`: Additional options, take the same arguments as `technology` in physical network format.
     - `time_unit`/`data_unit`/`rate_unit`: Default units used in the following sections
 - `flows`: array of flows, each flow has the following attributes
     - `name`: Name of flow
-    - `path`: An array to represent path of flow, written as names of servers defined in `servers`. 
-    - `arrival_curve`: A multi-segment curve, which has 2 attributes `bursts` and `rates`. Both attributes are arrays and must have the same length. Burst and arrival rate wit hthe same index correspond to a token-bucket curve, and the final arrival curve is defined as minimum of all these curves.
+    - `path`: An array to represent the path of flow, written as names of servers defined in `servers`.
+    - `multicast`: In case of defining a multicast flow, one can specify an extra list of paths indicated by `name` and `path` of each path.
+    - `arrival_curve`: A multi-segment curve, which has 2 attributes `bursts` and `rates`. Both attributes are arrays and must have the same length. Burst and arrival rate with the same index correspond to a token-bucket curve, and the final arrival curve is defined as the minimum of all these curves.
     - `max/min_packet_length`: The maximum/minimum packet length of the flow.
 
     Example:
@@ -400,6 +401,12 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
         {
             "name": "f0",
             "path": ["s0-o0", "s1-o0"],
+            "multicast": [
+                {
+                    "name": "p1",
+                    "path": ["s0-o0", "s1-o1"]
+                }
+            ],
             "arrival_curve": {
                 "bursts": [1, "5GB"],
                 "rates": [10, "100Gbps"]
@@ -410,8 +417,6 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
         }
     ]
     ```
-
-    Note that all flows in the output port format are assumed to be _unicast_ flows. If it's converted from a physical network with multicast flows, the multicast paths will be split into multiple unicast flows with the same arrival curve and source.
 
 - `servers`: an array of servers, each server has the following attributes
     - `name`: Name of server
@@ -458,7 +463,7 @@ An Output-port network is defined as a `.json` file. It contains only one `JSON 
     Note: 
     1. `DNC` cannot set output shaping together with _FIFO_ multiplexing, unless you are using _Arbitrary_ multiplexing (for PMOO or TMA). 
     2. `Panco-ELP` doesn't allow cyclic dependent network.
-    3. Multicast flow can only be defined as a physical network.
+    3. `xTFA` is the only tool having a built-in multicast flow handler. All other tools treat multicast flows as multiple separate flows, and take the maximum delay out of all paths.
 
 ### Command Line Exection
 Use Saihu via command line is possible with [main.py](src/main.py). Once you define a network in either of the formats mentioned in [Network Description File](#network-description-file), you can analyze your network file via the commands line tool below.
